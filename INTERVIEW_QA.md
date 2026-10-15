@@ -163,7 +163,7 @@ v remembers about 1/(1 − β2) steps: 20 or 1,000. If the gradient size jumps, 
 It prevents division by zero. At large width, gradients become small, and ε can become comparable with √v̂. Then the step shrinks silently. Wortsman et al. show this and use a smaller ε. Everett et al. remove ε with Adam-atan2. I would log the share of weights where ε > 0.1·√v̂.
 
 **G5. Why does warmup help? Give two explanations.**
-First, early v̂ is based on few samples and has a high variance (RAdam). Small early steps protect the model until v̂ is reliable. Second, warmup moves the model to flatter regions, so a larger peak η becomes stable (Kalra and Barkeshli).
+First, early v̂ is based on few samples and has a high variance (RAdam). Ma and Yarats disagree: the cause is the large size of the early update, and simple linear warmup over 2/(1 − β2) steps works as well as RAdam. Second, warmup moves the model to flatter regions, so a larger peak η becomes stable (Kalra and Barkeshli). The causes are debated; the practical result is the same.
 
 **G6. How do LR and batch size interact?**
 For SGD, a linear rule (Goyal et al.). For Adam, a square-root rule fits better (Malladi et al.). Above the critical batch size, more batch does not reduce steps (McCandlish et al.). I would measure the gradient noise scale on a proxy.
