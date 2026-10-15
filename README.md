@@ -1,0 +1,41 @@
+# Optimizer and Schedule Diagnostics (Session 11)
+
+ERA V5 Session 11 assignment: Adam by hand, bias correction, update-to-weight ratio, cosine vs WSD, and a learning-rate sweep across widths. The task text is in [assignment.md](assignment.md).
+
+The model is the char-level nanoGPT on Tiny Shakespeare from [training-loop-diagnostics](https://github.com/jssunil/training-loop-diagnostics) (Session 10).
+
+## How to run
+
+```
+python -m venv .venv && .venv\Scripts\activate
+pip install -r requirements.txt
+python -m src.p1_adam_by_hand
+python -m src.p2_bias_correction
+python -m src.p3_update_ratio
+python -m src.p4_cosine_vs_wsd
+python -m src.p5_lr_sweep
+pytest
+```
+
+Each part writes its numbers to `results/<part>.json`, its plot to `results/<part>.png` and its log to `results/logs/<part>.log`.
+
+## Part 1: Adam by hand
+
+## Part 2: Bias correction
+
+## Part 3: Update-to-weight ratio during warmup
+
+## Part 4: Cosine vs WSD, stopped at step 200
+
+## Part 5: Learning-rate sweep at widths 256, 512 and 1024
+
+## Fair comparison: how both sides were tuned
+
+## Limits
+
+## References
+
+- Kingma and Ba, Adam: A Method for Stochastic Optimization, arXiv:1412.6980
+- Loshchilov and Hutter, Decoupled Weight Decay Regularization (AdamW), arXiv:1711.05101
+- Hu et al., MiniCPM (WSD schedule), arXiv:2404.06395
+- Yang et al., Tensor Programs V (μP), arXiv:2203.03466
