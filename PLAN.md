@@ -35,6 +35,7 @@ The submission is a GitHub repository with `README.md` and the support code.
 
 | Word | Meaning in this document |
 |---|---|
+| token | One unit of text. Here, one GPT-2 BPE token (vocabulary V = 50,257, padded to 50,304). |
 | weight | One number in the model that training can change. |
 | gradient (g) | One number for one weight. It tells how much the loss changes when that weight changes. |
 | step (t) | One update of all weights. The first step is t = 1. |
@@ -72,7 +73,7 @@ The submission is a GitHub repository with `README.md` and the support code.
 | Measured speed | P10 reached 23% MFU on the 175.8 TFLOP/s peak, about 40 TFLOP/s, at 10.7 M weights. |
 | GPU sharing | `src/device.py` keeps the GPU busy 60% of the time (`GPU_DUTY = 0.6`), so wall time is about 1.7× compute time. |
 
-**Frugal rule.** The full project must run in less than 1 GPU-hour on the local card. A principal architect spends compute on the decision, not on the size of the model. Section 11 gives the budget for each part.
+**Frugal rule.** The full project must run in about 1 GPU-hour on the local card. A principal architect spends compute on the decision, not on the size of the model. Section 11 gives the budget for each part.
 
 ---
 
@@ -80,25 +81,46 @@ The submission is a GitHub repository with `README.md` and the support code.
 
 ### 4.1 Model
 
-Use the nanoGPT model from P10 (`src/model.py`). It is copied unchanged. Dropout is 0, so a fixed seed gives the same result each time.
+Use the nanoGPT model from P10 (`src/model.py`). It is copied unchanged. Dropout is 0, so a fixed seed gives the same result each time. The vocabulary is the GPT-2 vocabulary (V = 50,304 after padding).
 
-| Name | Layers | Heads | Width (d) | Context (T) | Weights (about) | Used in |
+| Name | Layers | Heads | Width (d) | Context (T) | Weights (about): blocks + embedding = total | Used in |
 |---|---|---|---|---|---|---|
-| S | 4 | 4 | 128 | 128 | 0.8 M | parts 3 and 4 |
-| W256 | 4 | 4 | 256 | 256 | 3.2 M | part 5 |
-| W512 | 4 | 8 | 512 | 256 | 12.6 M | part 5 |
-| W1024 | 4 | 16 | 1024 | 256 | 50 M | part 5 |
-| (W4096) | 4 | 64 | 4096 | 256 | 805 M | prediction only, not trained |
+| S (= W256) | 4 | 4 | 256 | 512 | 3.2 M + 12.9 M = 16 M | parts 2, 3, 4 and 5 |
+| W512 | 4 | 8 | 512 | 512 | 12.6 M + 25.8 M = 38 M | part 5 |
+| W1024 | 4 | 16 | 1024 | 512 | 50.3 M + 51.5 M = 102 M | part 5 |
+| (W4096) | 4 | 64 | 4096 | 512 | 805 M + 206 M = 1.0 B | prediction only, not trained |
 
-The weight counts use 12 · L · d² for the blocks. The embeddings add a small amount (V = 65).
+The block weights use 12 · L · d². The embedding is V · d. The output layer shares the embedding matrix (weight tying), but its matrix multiplication is the largest single cost in the step.
 
 The head size is 64 at every width in part 5. Thus, only the width changes. Attention shape stays the same.
 
-### 4.2 Data
+### 4.2 Data: FineWeb, 100 M tokens
 
-Use Tiny Shakespeare from P10 (`src/data.py`). One token is one character. V = 65. The first 90% is for training. The last 10% is for validation. The training split has about 1.0 M tokens.
+Use FineWeb web text, already tokenized with the GPT-2 tokenizer. The modded-nanogpt speedrun uses the same files (Hugging Face dataset `kjj0/fineweb10B-gpt2`). Each shard has 100 M tokens in 200 MB.
 
-**Data limit.** A run that reads more than about 2 M tokens sees the same text twice or more. Then the validation loss also measures memorization. Keep each run at 2 epochs or fewer. Each part gives its token count.
+| Split | File | Tokens |
+|---|---|---|
+| Training | `fineweb_train_000001.bin` | 100 M |
+| Validation | `fineweb_val_000000.bin` | 100 M (use a fixed set of 40 batches = 0.33 M tokens) |
+
+**Why medium data and not Tiny Shakespeare:**
+- Tiny Shakespeare has 1 M training tokens. The full study reads about 240 M tokens. With 1 M tokens, each run reads the same text many times, and the validation loss measures memorization.
+- Character tokens (V = 65) do not behave like LLM tokens. A 50 K vocabulary gives sparse embedding gradients and a heavy-tailed token frequency. These change the optimizer behaviour that the assignment studies (v of rare rows, update ratio of embeddings).
+- Web text is the data type of real pretraining. The LR and schedule results then transfer better to V5.
+
+**Data options:**
+
+| Option | Advantage | Disadvantage | Selected |
+|---|---|---|---|
+| Tiny Shakespeare (P10) | Already on disk. Very fast. | 1 M tokens; repeats; character vocabulary. | No |
+| TinyStories | Small models learn it fast. Clear loss curves. | Simple, narrow text. LR results transfer less to web text. | No |
+| OpenWebText (nanoGPT) | Known baseline for GPT-2 small. | About 54 GB download and a tokenization step. | No |
+| FineWeb-Edu `sample-10BT` (parquet) | High-quality web text. | You must tokenize it first (CPU time). | Fallback |
+| **FineWeb GPT-2 shards (`kjj0/fineweb10B-gpt2`)** | Already tokenized. 400 MB for train + val. Same data as the modded-nanogpt speedrun. | Fixed GPT-2 tokenizer, not the V5 tokenizer. | **Yes** |
+
+**Loader.** Write `src/data_fineweb.py`. Read each shard with `numpy.memmap` as `uint16` after its header. Read the header format from `modded-nanogpt` before you write the loader. Take random windows of T + 1 tokens with a seeded generator. Thus, the same seed gives the same data order. Get the files with `scripts/get_fineweb.py` into `data/` (not in git).
+
+**Data limit.** All runs together read about 240 M tokens as random windows from a 100 M-token shard. Each run alone reads 1.6–2.5 M tokens. Thus, a single run does not repeat data in a meaningful way.
 
 ### 4.3 Shared code to write once
 
@@ -107,7 +129,8 @@ Use Tiny Shakespeare from P10 (`src/data.py`). One token is one character. V = 6
 | `src/ref_adam.py` | A reference Adam in about 20 lines: scalar or tensor, switches for bias correction and decoupled weight decay. | parts 1, 2 |
 | `src/schedules.py` | `lr_at(step, kind, peak, warmup, total, ...)` for constant, cosine, WSD (linear, cosine, 1−sqrt decay). | parts 3, 4, 5 |
 | `src/train.py` | One training function: config, schedule, seed, step count, hooks. It returns the logs. It uses AdamW with two parameter groups. | parts 3, 4, 5 |
-| `src/eval.py` | Validation loss on a fixed set of batches (same batches for every run). | parts 4, 5 |
+| `src/eval.py` | Validation loss on a fixed set of 40 validation batches (same batches for every run). | parts 2–5 |
+| `src/data_fineweb.py` | Memory-mapped FineWeb shards, seeded random windows. | parts 2–5 |
 
 **Parameter groups.** Apply weight decay only to 2-D weight matrices. Do not decay biases, LayerNorm weights or the position embedding. nanoGPT `configure_optimizers` does this. Use the same rule.
 
@@ -277,7 +300,7 @@ A common guide is ρ ≈ 1e-3 (Karpathy, cs231n notes). A much larger value mean
 
 | Option | Advantage | Disadvantage | Selected |
 |---|---|---|---|
-| A. ρ from W before and after `opt.step()` | Measures the real change, with weight decay and clipping included. | One copy of the weights each step. Small at 0.8 M weights. | **Yes** |
+| A. ρ from W before and after `opt.step()` | Measures the real change, with weight decay and clipping included. | One copy of the weights each step. Small at 16 M weights (64 MB in fp32). | **Yes** |
 | B. ρ from η · m̂/(√v̂ + ε), read from the optimizer state | No weight copy. | Misses weight decay and clipping. | No |
 | C. Per-element RMS of the update (as Muon and Moonlight report it) | Does not depend on the matrix size. | Not the quantity the assignment asks for. | Log as extra |
 | D. Angle between W before and after | Matches the rotational-equilibrium theory. | Harder to read. | Log as extra |
@@ -313,7 +336,7 @@ A common guide is ρ ≈ 1e-3 (Karpathy, cs231n notes). A much larger value mean
 
 - Gradient clipping changes the update in the first steps. Log the grad norm and the clip events.
 - Weight tying: `wte` and `lm_head` share one matrix. Log it once.
-- Embeddings get sparse gradients (only the rows of tokens in the batch). Their ρ is different. Report them apart from the block matrices.
+- Embeddings get sparse gradients: only the rows of tokens in the batch change. With V = 50,304, most rows do not change in a step. Their ρ is much smaller. Report them apart from the block matrices.
 
 ---
 
@@ -355,7 +378,7 @@ C and D cost little. They change the answer from an opinion into a measurement.
 4. If the best value is at the edge of the grid, add one more value past the edge.
 5. Compare the arms at their own best peak LR.
 
-Tokens: batch 32 × 128 = 4,096 tokens per step. 200 steps = 0.8 M tokens, less than one epoch.
+Tokens: batch 16 × 512 = 8,192 tokens per step. 200 steps = 1.6 M tokens, from a 100 M-token shard.
 
 ### 8.5 Design options
 
@@ -406,8 +429,8 @@ nanoGPT uses the standard parameterization (SP). In SP with Adam, the size of th
 | Option | Advantage | Disadvantage | Selected |
 |---|---|---|---|
 | Fixed depth (4 layers), head size 64 | Only the width changes. | Not how real model families grow. | **Yes** |
-| Fixed tokens per run (1.2 M) | Equal data for each width. | Large widths are further from convergence. | **Yes** |
-| Fixed compute per run | Fair in FLOPs. | Small widths see much more data. Data repeats. | No |
+| Fixed tokens per run (2.5 M) | Equal data for each width. | Large widths are further from convergence. | **Yes** |
+| Fixed compute per run | Fair in FLOPs. | Small widths see 6× more data. The data amount then changes with the width. | No |
 | LR grid: 9 values at ×√2 spacing | Fine enough for a parabola fit. | 27 runs per seed. | **Yes** |
 | LR grid: ×2 spacing | Fewer runs. | The minimum is less exact. | Fallback if time is short |
 | Schedule: same warmup + cosine for all runs | Removes the schedule as a variable. | — | **Yes** |
@@ -416,7 +439,7 @@ nanoGPT uses the standard parameterization (SP). In SP with Adam, the size of th
 
 Grid centre: about 1e-3. Grid: 2.5e-4 to 4e-3, nine values (×√2). Extend it if a minimum is at the edge.
 
-Tokens: batch 16 × 256 = 4,096 tokens per step, 300 steps = 1.2 M tokens, about 1.2 epochs.
+Tokens: batch 16 × 512 = 8,192 tokens per step, 300 steps = 2.5 M tokens. This is far below the compute-optimal amount (about 20 tokens per weight). Thus, LR* here is the best LR for a short run.
 
 ### 9.4 Finding each minimum
 
@@ -435,7 +458,8 @@ The exponent b is usually between −1 and 0 in SP. Report the measured value.
 
 **Confidence statement.** State "low to moderate", for these reasons:
 - 4096 is 4× outside the measured range. Three points fix a line but do not test it.
-- A 805 M-weight model trains on many more tokens. LR* goes down with longer training.
+- A 1 B-weight model trains on many more tokens. LR* goes down with longer training.
+- At small width, the embedding is most of the model (80% of the weights at W256, 50% at W1024). The trend mixes two layer types. μP treats the output layer with its own rule.
 - Batch size and depth also move LR*. Here they are fixed.
 - At large width, ε can become large relative to √v̂ (Wortsman et al., 2023). This changes the optimizer.
 
@@ -475,14 +499,14 @@ Estimate: compute time = 6 × weights × tokens ÷ 40 TFLOP/s. Small models reac
 | Part | Runs | Model | Tokens per run | Wall time (about) |
 |---|---|---|---|---|
 | 1 | 4 | scalar | — | seconds |
-| 2 | 2 scalar + 6 model | scalar, S | 1.2 M | 2 min |
-| 3 | 6 | S | 1.2 M | 2 min |
-| 4 | 3 arms × 5 LRs × 3 seeds + 3 branches = 48 | S | 0.8 M | 12 min |
-| 5 | 54 | W256–W1024 | 1.2 M | 25 min |
-| **Total** | about 115 | | | **about 45 min** |
+| 2 | 2 scalar + 6 model | scalar, S | 2.5 M | 3 min |
+| 3 | 6 | S | 2.5 M | 3 min |
+| 4 | 3 arms × 5 LRs × 3 seeds + 3 branches = 48 | S | 1.6 M | 14 min |
+| 5 | 54 | W256–W1024 | 2.5 M | 37 min (W1024 is 20 min of it) |
+| **Total** | about 115 | | about 240 M in total | **about 60 min**, plus a 400 MB download |
 
 **What to cut first if time is short:**
-1. Part 5: use ×2 LR spacing (5 values) and 1 seed. Saves about 15 min.
+1. Part 5: use ×2 LR spacing (5 values) and 1 seed. Saves about 25 min.
 2. Part 4: drop arm D. Use 2 seeds.
 3. Do not cut arm C or the tuning of both sides. They are the point of the assignment.
 

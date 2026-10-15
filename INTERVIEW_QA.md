@@ -13,7 +13,7 @@ Fill the `[result]` marks with your numbers after the runs.
 ## A. Project summary
 
 **A1. Describe the project in 30 seconds.**
-I made the optimizer and the schedule of a small GPT measurable. I calculated Adam by hand and matched PyTorch on three code paths. I measured the bias-correction error, the update-to-weight ratio during warmup, cosine against WSD at an early stop, and the best LR at three widths. Each comparison was tuned on both sides, with 2–3 seeds. The full study runs in about 45 GPU-minutes on one consumer GPU.
+I made the optimizer and the schedule of a small GPT measurable. I calculated Adam by hand and matched PyTorch on three code paths. I measured the bias-correction error, the update-to-weight ratio during warmup, cosine against WSD at an early stop, and the best LR at three widths. Each comparison was tuned on both sides, with 2–3 seeds. The data is 100 M tokens of FineWeb web text. The full study runs in about one GPU-hour on one consumer GPU.
 
 **A2. Why does this matter for a company that trains LLMs?**
 The optimizer and the schedule decide most of the result for a given compute budget. Their errors do not crash a run. They make it slowly worse. A team that can measure these effects on small proxies saves large runs. On a frugal budget, that is the main lever.
@@ -141,7 +141,10 @@ Use μP or per-layer η rules. Then the best η stays almost constant with width
 A parabola fit in log-LR around the lowest point, then a bootstrap over seeds for an interval. The lowest grid point alone has an error of half a grid step.
 
 **F7. Why fixed tokens per run and not fixed compute?**
-With fixed compute, the small model reads much more data and repeats Tiny Shakespeare many times. Then the validation loss measures memorization. Fixed tokens keep the data effect the same for all widths. The cost is that larger widths are less converged. I state this as a limit.
+With fixed compute, the small model reads about 6× more tokens than the large one. Then the data amount changes with the width, and LR* depends on the data amount. Fixed tokens keep the data effect the same for all widths. The cost is that larger widths are less converged. I state this as a limit.
+
+**F8. Why FineWeb and not a small dataset like Tiny Shakespeare?**
+Tiny Shakespeare has 1 M tokens; the study reads about 240 M. The runs would repeat the text and measure memorization. Its character vocabulary also hides the optimizer effects of a 50 K vocabulary: sparse embedding gradients and rare-token rows with small v. I used pre-tokenized FineWeb shards, so the data cost was a 400 MB download and no tokenization.
 
 ---
 
@@ -229,7 +232,7 @@ Five seeds instead of three. A μP version of part 5, to show transfer directly.
 
 ## K. Limits to state without being asked
 
-1. The model is small (0.8 M–50 M weights) and the data is character-level Tiny Shakespeare.
+1. The models are small (16 M–102 M weights). Each run reads 1.6–2.5 M tokens, far below compute-optimal. The tokenizer is GPT-2, not the V5 tokenizer.
 2. The runs are short (300 steps). Some effects only show in long runs.
 3. The width-4096 prediction is an extrapolation of 4×.
 4. Two or three seeds give a rough noise band, not a full distribution.

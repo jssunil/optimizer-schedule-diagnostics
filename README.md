@@ -2,7 +2,7 @@
 
 ERA V5 Session 11 assignment: Adam by hand, bias correction, update-to-weight ratio, cosine vs WSD, and a learning-rate sweep across widths. The task text is in [assignment.md](assignment.md).
 
-The model is the char-level nanoGPT on Tiny Shakespeare from [training-loop-diagnostics](https://github.com/jssunil/training-loop-diagnostics) (Session 10).
+The model is nanoGPT from [training-loop-diagnostics](https://github.com/jssunil/training-loop-diagnostics) (Session 10). The data is FineWeb web text, pre-tokenized with GPT-2 BPE (`kjj0/fineweb10B-gpt2` on Hugging Face): one 100 M-token training shard and one validation shard.
 
 ## Documents
 
@@ -17,6 +17,7 @@ The model is the char-level nanoGPT on Tiny Shakespeare from [training-loop-diag
 ```
 python -m venv .venv && .venv\Scripts\activate
 pip install -r requirements.txt
+python scripts/get_fineweb.py      # about 400 MB into data/
 python -m src.p1_adam_by_hand
 python -m src.p2_bias_correction
 python -m src.p3_update_ratio
