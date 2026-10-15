@@ -22,8 +22,18 @@ python -m src.p1_adam_by_hand
 python -m src.p2_bias_correction
 python -m src.p3_update_ratio
 python -m src.p4_cosine_vs_wsd
+python -m src.p5_lr_sweep          # P5_FAST=1: x2 spacing and 1 seed
+pytest                             # CPU only, no download needed
+```
+
+Smoke test of every code path first (a few minutes, the numbers mean nothing):
+
+```
+set QUICK=1   (PowerShell: $env:QUICK="1")
+python -m src.p2_bias_correction
+python -m src.p3_update_ratio
+python -m src.p4_cosine_vs_wsd
 python -m src.p5_lr_sweep
-pytest
 ```
 
 Each part writes its numbers to `results/<part>.json`, its plot to `results/<part>.png` and its log to `results/logs/<part>.log`.

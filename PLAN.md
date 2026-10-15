@@ -126,13 +126,13 @@ Use FineWeb web text, already tokenized with the GPT-2 tokenizer. The modded-nan
 
 | File | Content | Used by |
 |---|---|---|
-| `src/ref_adam.py` | A reference Adam in about 20 lines: scalar or tensor, switches for bias correction and decoupled weight decay. | parts 1, 2 |
-| `src/schedules.py` | `lr_at(step, kind, peak, warmup, total, ...)` for constant, cosine, WSD (linear, cosine, 1−sqrt decay). | parts 3, 4, 5 |
-| `src/train.py` | One training function: config, schedule, seed, step count, hooks. It returns the logs. It uses AdamW with two parameter groups. | parts 3, 4, 5 |
-| `src/eval.py` | Validation loss on a fixed set of 40 validation batches (same batches for every run). | parts 2–5 |
+| `src/ref_adam.py` | `adam_by_hand` (scalar, float64, L2 or decoupled decay, bias-correction switch), `RefAdamW` (torch optimizer with a bias-correction switch) and `bias_ratio`. Done. | parts 1, 2 |
+| `src/schedules.py` | `lr_at(step, kind, peak, warmup, total, ...)` for constant, cosine, WSD (linear, cosine, 1−sqrt decay). Done. | parts 2–5 |
+| `src/train.py` | `Run` (all settings of one run), `train` (one run; logs loss, LR, grad norm, update ratio), `evaluate`, `lr_sweep` (with the grid-edge rule) and `QUICK=1` smoke-test mode. Done. | parts 2–5 |
+| `train.evaluate` + `FineWebData.eval_batches` | Validation loss on a fixed set of 40 validation batches (same batches for every run). Done. | parts 4, 5 |
 | `src/data.py` | FineWeb shards (memory-mapped), seeded random windows, fixed validation batches, width configs. Done. | parts 2–5 |
 
-**Parameter groups.** Apply weight decay only to 2-D weight matrices. Do not decay biases, LayerNorm weights or the position embedding. nanoGPT `configure_optimizers` does this. Use the same rule.
+**Parameter groups.** Use the nanoGPT `configure_optimizers` rule: decay every tensor with 2 or more dimensions (block matrices, the tied token embedding and output layer, the position embedding). Do not decay biases or LayerNorm weights.
 
 **Optimizer defaults** (unless a part says different): AdamW, β1 = 0.9, β2 = 0.95, ε = 1e-8, λ = 0.1, gradient clipping at 1.0, bf16 autocast, fixed batch.
 
@@ -272,7 +272,7 @@ Three facts come from this table:
 3. Plot the step size against t for both runs. Plot r(t) on a second axis.
 4. Repeat steps 2 and 3 for β2 = 0.95 and β2 = 0.999.
 5. Extend the scalar run to 5,000 steps. Find the first t where |r(t) − 1| < 1%.
-6. Train model S for 300 steps with each setting. Use 3 seeds. Use no warmup.
+6. Train model S for 300 steps with each setting, for both β2 values. Use 3 seeds (12 runs). Use no warmup.
 7. Plot the mean loss and the seed range for both settings.
 8. Find the first step after which the two loss bands overlap and stay overlapped.
 9. Save the plots and numbers to `results/p2_bias_correction.*`.
@@ -409,7 +409,7 @@ A principal architect keeps the WSD checkpoint *and* a cooled-down branch. One r
 
 1. Write `lr_at` for cosine and WSD. Plot both schedules first.
 2. Run the LR sweep for arms A, B and D (5 LRs × 3 seeds each).
-3. For arm C, save B checkpoints at step 160. Run the 40-step decay for each seed.
+3. For arm C, run WSD planned for 200 steps at B's best LR, with B's seeds. Its LR equals B's LR up to step 160, so it is the same run as B up to step 160. Thus, no checkpoint file is necessary.
 4. Calculate the validation loss at step 200 for every run.
 5. Make a table: arm, best peak LR, mean loss, seed range.
 6. Plot the loss curves at the best LR for each arm, with the LR curve below.
@@ -507,7 +507,7 @@ Estimate: compute time = 6 × weights × tokens ÷ 40 TFLOP/s. Small models reac
 | Part | Runs | Model | Tokens per run | Wall time (about) |
 |---|---|---|---|---|
 | 1 | 4 | scalar | — | seconds |
-| 2 | 2 scalar + 6 model | scalar, S | 2.5 M | 3 min |
+| 2 | 2 scalar + 12 model | scalar, S | 2.5 M | 6 min |
 | 3 | 6 | S | 2.5 M | 3 min |
 | 4 | 3 arms × 5 LRs × 3 seeds + 3 branches = 48 | S | 1.6 M | 14 min |
 | 5 | 54 | W256–W1024 | 2.5 M | 37 min (W1024 is 20 min of it) |
