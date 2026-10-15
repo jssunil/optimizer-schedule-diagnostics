@@ -124,6 +124,76 @@ Decay 2-D weight matrices only. Do not decay biases, LayerNorm or RMSNorm gains.
 
 In a long pretraining run, the model sees each token about once. Overfitting is not the main problem. Kosson et al. (2023) show a different role: with normalization layers, weight decay and the gradient updates reach a balance. The weight norm becomes stable, and each update rotates the weight by a stable angle. For AdamW they give this equilibrium angle as about √(2ηλ) per step. Thus, η and λ together set the effective learning speed of each layer. This is why part 3 sees ρ settle after warmup.
 
+### 4.5 PyTorch `Adam` and `AdamW`: the exact update that the code runs
+
+Sources: the PyTorch 2.14 documentation pages for `torch.optim.Adam` and `torch.optim.AdamW`, and the installed source `torch/optim/adam.py` and `adamw.py` (PyTorch 2.7.0, used by this project). The algorithm is the same in both versions.
+
+**Signatures and defaults**
+
+| Argument | `Adam` | `AdamW` | Meaning |
+|---|---|---|---|
+| `lr` | 1e-3 | 1e-3 | γ. A float, or a tensor (a tensor only with `fused=True` or `capturable=True`). |
+| `betas` | (0.9, 0.999) | (0.9, 0.999) | β1, β2. A float or a 1-element tensor. |
+| `eps` | 1e-8 | 1e-8 | ε, added to √v̂. |
+| `weight_decay` | **0** | **0.01** | λ. In `Adam` it is an L2 penalty. In `AdamW` it is decoupled decay. |
+| `amsgrad` | False | False | Use the maximum of v (Reddi et al.). |
+| `maximize` | False | False | Use −g, to maximize the objective. |
+| `foreach` | None | None | Group the tensors in one kernel call per operation. |
+| `fused` | None | None | Do the full update in one kernel. |
+| `capturable` | False | False | Safe for CUDA graph capture. |
+| `differentiable` | False | False | Let autograd go through the step. |
+| `decoupled_weight_decay` | False | (always True) | `Adam(..., decoupled_weight_decay=True)` is AdamW. |
+
+In PyTorch 2.7, `AdamW` is a subclass of `Adam`. It only sets `decoupled_weight_decay=True`. The same `step()` code runs for both.
+
+**The algorithm (PyTorch documentation)**
+
+For each step t = 1, 2, …:
+1. g_t = ∇f(θ_{t−1}). If `maximize`, use −g_t.
+2. Weight decay:
+   - `Adam` with λ ≠ 0: g_t ← g_t + λθ_{t−1}. The decay goes into m and v.
+   - `AdamW`: θ ← θ_{t−1} − γλθ_{t−1}. This occurs **before** the moment updates, and the decay does not go into m or v.
+3. m_t = β1·m_{t−1} + (1 − β1)·g_t.
+4. v_t = β2·v_{t−1} + (1 − β2)·g_t².
+5. m̂_t = m_t / (1 − β1^t).
+6. v̂_t = v_t / (1 − β2^t). With `amsgrad`, use the running maximum of v_t first.
+7. θ_t = θ − γ·m̂_t / (√v̂_t + ε).
+
+**What the code does (single-tensor path, `adam.py`)**
+
+| Step | Code | Note |
+|---|---|---|
+| Step counter | `step_t += 1` | `state["step"]` is a scalar tensor. It is on the CPU, unless `fused` or `capturable` is set. |
+| AdamW decay | `param.mul_(1 - lr * weight_decay)` | The decay uses the **current** lr. Thus, it follows the schedule. |
+| Adam L2 | `grad = grad.add(param, alpha=weight_decay)` | The L2 term enters m and v. |
+| m | `exp_avg.lerp_(grad, 1 - beta1)` | m + (1 − β1)(g − m). Same algebra as the formula. Different rounding. |
+| v | `exp_avg_sq.mul_(beta2).addcmul_(grad, grad, value=1 - beta2)` | |
+| Bias factors | `bias_correction1 = 1 - beta1 ** step`, same for β2 | Calculated as Python floats from the step value. |
+| Update | `denom = (exp_avg_sq.sqrt() / sqrt(bias_correction2)).add_(eps)`, then `param.addcdiv_(exp_avg, denom, value=-lr / bias_correction1)` | Same as Algorithm 1: ε is added to √v̂. |
+
+**State for each parameter:** `step`, `exp_avg` (m) and `exp_avg_sq` (v). With `amsgrad`, also `max_exp_avg_sq`. The code makes m and v with `torch.zeros_like(param)`. Thus, m and v have the **same data type as the parameter**. If the parameters are bf16, the moments are also bf16. This loses precision. Keep fp32 master weights, or use an optimizer that keeps fp32 states.
+
+**Which code path runs**
+
+| Setting | Path |
+|---|---|
+| `foreach=None, fused=None`, all tensors on CUDA | foreach (the default on GPU) |
+| `fused=True` | fused (float64, float32, float16 and bfloat16 are supported) |
+| `foreach=False` or `fused=False` | single-tensor for-loop |
+| `differentiable=True` | single-tensor for-loop |
+
+The documentation says that fused is "theoretically fastest", but it is not the default yet: "the fused implementation is relatively new, we want to give it sufficient bake-in time." foreach uses about one extra copy of the parameters in peak memory.
+
+**Other documented rules**
+- `Adam` does not accept sparse gradients. Use `SparseAdam`.
+- Call `optimizer.load_state_dict()` after you make the LR scheduler. If you call it before, the scheduler overwrites the loaded learning rates.
+- `zero_grad()` sets gradients to `None` by default (`set_to_none=True`). This saves memory. A `None` gradient skips the parameter. A zero gradient does not: Adam still updates m, v and the weight.
+
+**Consequences for this project**
+1. Part 1 can compare the hand values with all three paths. All three must agree with Algorithm 1.
+2. In an LR sweep with `AdamW`, the decay per step is γλ. A sweep over γ with a fixed λ also changes the decay strength. Report λ, and keep it fixed across the sweep (part 4 and part 5). Some teams keep γλ fixed instead. State the choice.
+3. A zero gradient still moves a weight in Adam, because m is not zero. The rows of rare tokens in the embedding keep moving after their gradient stops. This is one reason why part 3 reports the embeddings apart from the block matrices.
+
 ---
 
 ## 5. Warmup

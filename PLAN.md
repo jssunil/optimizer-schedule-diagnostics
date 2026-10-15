@@ -154,7 +154,12 @@ $$\hat m_t = \frac{m_t}{1-\beta_1^t} \qquad \hat v_t = \frac{v_t}{1-\beta_2^t} \
 
 m_0 = v_0 = 0. These are the equations of Algorithm 1 in Kingma and Ba (2014).
 
-**What PyTorch does.** In `torch/optim/adam.py` (single-tensor path), PyTorch calculates `denom = sqrt(v) / sqrt(1 − β2^t) + ε` and `step_size = η / (1 − β1^t)`. This is the same as Algorithm 1. The order of the operations is different, so float results can differ in the last bits.
+**What PyTorch does.** In `torch/optim/adam.py` (single-tensor path), PyTorch calculates `denom = sqrt(v) / sqrt(1 − β2^t) + ε` and `step_size = η / (1 − β1^t)`. This is the same as Algorithm 1. The order of the operations is different, so float results can differ in the last bits. Other details that part 1 must match (PyTorch 2.7 source and 2.14 documentation; see [SESSION_11_EXPLAINER.md section 4.5](SESSION_11_EXPLAINER.md#45-pytorch-adam-and-adamw-the-exact-update-that-the-code-runs)):
+- m is updated with `exp_avg.lerp_(grad, 1 − β1)`. The algebra is the same as β1·m + (1 − β1)·g.
+- `state["step"]` is a scalar tensor. The bias factors use it as a Python float.
+- m and v have the data type of the parameter. Thus, a float64 weight gives float64 states.
+- `AdamW` is `Adam` with `decoupled_weight_decay=True`. It multiplies the weight by (1 − γλ) **before** the moment updates. `Adam` with `weight_decay` adds λθ to the gradient instead.
+- The default `AdamW` λ is 0.01, not 0. Set `weight_decay=0` in part 1.
 
 **The other form.** Section 2 of the Adam paper gives a faster form: η_t = η·√(1−β2^t)/(1−β1^t) and Δθ = −η_t·m/(√v + ε̂). In that form, ε̂ is not the same number as ε. Some older libraries use that form. Thus, "Adam" in two libraries can give different steps when ε is not small compared with √v̂.
 
@@ -167,6 +172,7 @@ m_0 = v_0 = 0. These are the equations of Algorithm 1 in Kingma and Ba (2014).
 | C. Exact fractions (`fractions.Fraction`) | Exact values, no rounding at all. | √ is not exact; you must round at the square root. Slow; no gain over A. | No |
 | D. Subclass `torch.optim.Optimizer` and compare | Gives code that you can reuse in part 2. | A bug in your class can match a bug in your hand values. It does not prove the hand values. | Use as `ref_adam.py`, check it against A |
 | E. Compare `foreach=False`, `foreach=True` and `fused=True` | Shows that the three PyTorch code paths agree. Fused is the path in fast training. | `fused=True` needs CUDA. | **Yes (extra row)** |
+| F. Repeat with λ = 0.1: `Adam(weight_decay=0.1)` (L2) and `AdamW(weight_decay=0.1)` (decoupled), each against a hand calculation | Shows the difference between L2 and decoupled decay with numbers, in 5 steps. | Not asked by the task. | Yes (short extra table) |
 
 **Selected design:** A as the truth, B and E as extra checks, D as the reusable code. A principal engineer checks the production code path (fused), not only the textbook path.
 
@@ -436,6 +442,8 @@ nanoGPT uses the standard parameterization (SP). In SP with Adam, the size of th
 | Schedule: same warmup + cosine for all runs | Removes the schedule as a variable. | — | **Yes** |
 | μP version as a second sweep | Shows the production fix. | Needs `mup` package or extra code. | Only if time |
 | Seeds: 2 per point | Gives a noise band for the minimum. | Doubles cost. | **Yes** |
+| Fixed λ = 0.1 across the LR grid | PyTorch `AdamW` decay per step is γλ, so the decay grows with γ. This is the usual practice; state it. | The decay strength is not constant across the sweep. | **Yes** |
+| Fixed γλ across the LR grid | Same decay strength at every LR. | Not the usual practice; another variable to explain. | No; mention in the README |
 
 Grid centre: about 1e-3. Grid: 2.5e-4 to 4e-3, nine values (×√2). Extend it if a minimum is at the edge.
 
