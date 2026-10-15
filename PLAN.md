@@ -118,7 +118,7 @@ Use FineWeb web text, already tokenized with the GPT-2 tokenizer. The modded-nan
 | FineWeb-Edu `sample-10BT` (parquet) | High-quality web text. | You must tokenize it first (CPU time). | Fallback |
 | **FineWeb GPT-2 shards (`kjj0/fineweb10B-gpt2`)** | Already tokenized. 400 MB for train + val. Same data as the modded-nanogpt speedrun. | Fixed GPT-2 tokenizer, not the V5 tokenizer. | **Yes** |
 
-**Loader.** Write `src/data_fineweb.py`. Read each shard with `numpy.memmap` as `uint16` after its header. Read the header format from `modded-nanogpt` before you write the loader. Take random windows of T + 1 tokens with a seeded generator. Thus, the same seed gives the same data order. Get the files with `scripts/get_fineweb.py` into `data/` (not in git).
+**Loader.** `src/data.py` (`FineWebData`). It reads each shard with `numpy.memmap` as `uint16` after its header. It checks the header (format from `modded-nanogpt`: 256 int32, magic 20240520, version 1, token count) and the file size. It takes random windows of T + 1 tokens with a seeded generator. Thus, the same seed gives the same data order. Get the files with `scripts/get_fineweb.py` into `data/` (not in git).
 
 **Data limit.** All runs together read about 240 M tokens as random windows from a 100 M-token shard. Each run alone reads 1.6–2.5 M tokens. Thus, a single run does not repeat data in a meaningful way.
 
@@ -130,7 +130,7 @@ Use FineWeb web text, already tokenized with the GPT-2 tokenizer. The modded-nan
 | `src/schedules.py` | `lr_at(step, kind, peak, warmup, total, ...)` for constant, cosine, WSD (linear, cosine, 1−sqrt decay). | parts 3, 4, 5 |
 | `src/train.py` | One training function: config, schedule, seed, step count, hooks. It returns the logs. It uses AdamW with two parameter groups. | parts 3, 4, 5 |
 | `src/eval.py` | Validation loss on a fixed set of 40 validation batches (same batches for every run). | parts 2–5 |
-| `src/data_fineweb.py` | Memory-mapped FineWeb shards, seeded random windows. | parts 2–5 |
+| `src/data.py` | FineWeb shards (memory-mapped), seeded random windows, fixed validation batches, width configs. Done. | parts 2–5 |
 
 **Parameter groups.** Apply weight decay only to 2-D weight matrices. Do not decay biases, LayerNorm weights or the position embedding. nanoGPT `configure_optimizers` does this. Use the same rule.
 
