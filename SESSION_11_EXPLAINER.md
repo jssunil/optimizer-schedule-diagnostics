@@ -345,7 +345,7 @@ Articles: Karpathy, "A Recipe for Training Neural Networks" (2019 blog); Stanfor
 32. Vyas et al. *SOAP: Improving and Stabilizing Shampoo using Adam.* arXiv:2409.11321 (2024).
 33. Liu et al. *Muon is Scalable for LLM Training.* arXiv:2502.16982 (2025).
 
-**Priority for 16 Oct (about 2 hours):** 1 (§2–3), 10 (WSD section), 11 (cooldown results), 19 (§1–3). Read the others after the form.
+**Priority for 16 Oct:** see section 15 (reading order).
 
 ---
 
@@ -623,3 +623,54 @@ For each paper: the **key points**, the **use** in the assignment (P1–P5 = par
 8. Decay to zero often beats decay to 10%. (14)
 9. Tune at small width with μP or per-layer LR rules; scale ε correctly. (19, 20)
 10. Most optimizer claims fail when both sides are tuned and the baseline is fully decayed. (24, 27)
+
+---
+
+## 15. Reading order
+
+**Method.** For each paper, read the abstract, the first two pages and the last two pages. This takes about 25 minutes for each paper. The numbers match the paper numbers in section 13.
+
+**Caution.** The notes on what to look for come from the abstracts and the known main results. Check them while you read.
+
+### 15.1 Must read (8 papers)
+
+| No. | Paper | Why you must read it | What to look for in the first and last pages |
+|---|---|---|---|
+| 1 | Adam, arXiv:1412.6980 | It is the core of the session and of parts 1 and 2. | The first pages give Algorithm 1 and §2: the full update rule. Also read §3 (bias correction, one page). The conclusion is short; skim it. |
+| 2 | AdamW, arXiv:1711.05101 | Decoupled weight decay is the V5 default. | The introduction shows that L2 and weight decay are the same for SGD but not for Adam. The conclusion says that the best λ no longer depends on η. |
+| 6 | Ma and Yarats, untuned warmup, arXiv:1910.04209 | It gives the warmup rule for part 3. | The introduction refutes the RAdam explanation. The conclusion gives the rule: linear warmup over 2/(1 − β2) steps. |
+| 10 | MiniCPM, arXiv:2404.06395 | It introduced WSD. | **Exception.** The introduction and conclusion are about small models. Read the abstract, then go directly to the WSD section and its loss curves. |
+| 11 | Hägele et al., arXiv:2405.18392 | Constant η with a cooldown matches cosine (part 4, arm C). | The introduction tells why cosine makes scaling research expensive. The conclusion gives the cooldown length and the weight-averaging result. |
+| 12 | Wen et al., river valley, arXiv:2410.05192 | It explains why WSD loses at step 200 but is not worse. | The first pages have the river-valley figure. This is the key picture. The conclusion gives WSD-S. |
+| 19 | μP, Tensor Programs V, arXiv:2203.03466 | It answers the width-4096 question of part 5. | The first pages show the plot of η against width: SP moves, μP stays. That plot is a small copy of your part 5 result. The conclusion gives the cost savings. |
+| 24 | Choi et al., arXiv:1910.05446 | It is the source of the "tune both sides" rule. | The introduction says that the search space decides the ranking. The conclusion gives practical tuning advice. |
+
+### 15.2 Should read, after the form (6 papers)
+
+| No. | Paper | Why |
+|---|---|---|
+| 7 | Kalra and Barkeshli, arXiv:2406.09405 | The real gain of warmup is a stable higher peak η. |
+| 8 | Kosson et al., arXiv:2305.17212 | It explains why ρ settles after warmup (part 3). |
+| 14 | Bergsma et al., arXiv:2502.15938 | Decay to zero beats decay to 10%. |
+| 27 | Kaddour et al., arXiv:2307.06440 | Speed-up claims disappear against a fully decayed baseline. |
+| 20 | Everett et al., arXiv:2407.05872 | Per-layer η, and the ε problem at large width. |
+| 21 | Wortsman et al., arXiv:2309.14322 | LR sensitivity on small proxies. It links to Session 15. |
+
+### 15.3 Articles (short; read all of each)
+
+- Karpathy, "A Recipe for Training Neural Networks": practical training discipline.
+- PyTorch documentation for `torch.optim.Adam` and `torch.optim.AdamW`: the exact update that the code runs. Part 1 needs it.
+- Keller Jordan, "Muon": optional, for interview depth only.
+
+### 15.4 Not now
+
+Papers 3, 4, 5, 9, 13, 15–18, 22, 23, 25, 26, 28–33. The key points in section 14 are enough for the interview.
+
+### 15.5 Plan for 16 Oct
+
+| Time | Read |
+|---|---|
+| 08:00–09:00 | Adam (1), then AdamW (2). |
+| 10:45–11:15 | MiniCPM WSD section (10), then the Hägele et al. introduction (11). |
+| 15:30–16:00 | μP first pages (19). |
+| After the form | Ma and Yarats (6), Wen et al. (12), Choi et al. (24): about 75 minutes. |
