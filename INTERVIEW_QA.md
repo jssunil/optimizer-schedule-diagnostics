@@ -230,55 +230,55 @@ Five seeds instead of three. A μP version of part 5, to show transfer directly.
 
 ---
 
-## M. PyTorch `Adam` and `AdamW` internals
+## K. PyTorch `Adam` and `AdamW` internals
 
 Source: PyTorch 2.14 documentation and the PyTorch 2.7 source (`torch/optim/adam.py`, `adamw.py`). Details are in [SESSION_11_EXPLAINER.md section 4.5](SESSION_11_EXPLAINER.md#45-pytorch-adam-and-adamw-the-exact-update-that-the-code-runs).
 
-**M1. What is the difference between `torch.optim.Adam(weight_decay=0.1)` and `torch.optim.AdamW(weight_decay=0.1)`?**
+**K1. What is the difference between `torch.optim.Adam(weight_decay=0.1)` and `torch.optim.AdamW(weight_decay=0.1)`?**
 `Adam` adds λθ to the gradient. The term goes into m and v, and is divided by √v̂. That is L2 regularization, not weight decay. `AdamW` multiplies the weight by (1 − γλ) before the moment updates, and the decay never enters m or v. In PyTorch 2.7, `AdamW` is a subclass of `Adam` with `decoupled_weight_decay=True`.
 
-**M2. What are the default hyperparameters, and which default is dangerous?**
+**K2. What are the default hyperparameters, and which default is dangerous?**
 lr 1e-3, betas (0.9, 0.999), eps 1e-8. `Adam` has weight_decay 0; `AdamW` has 0.01. β2 = 0.999 is the paper default, not the LLM default. For pretraining I set β2 = 0.95 and λ = 0.1, and I build parameter groups so that 1-D weights get λ = 0. The default `AdamW` decays every parameter you pass to it, also the norms and biases.
 
-**M3. In `AdamW`, does the weight decay follow the LR schedule?**
+**K3. In `AdamW`, does the weight decay follow the LR schedule?**
 Yes. The code is `param.mul_(1 - lr * weight_decay)` with the current lr. Thus, the decay per step is γ_t·λ, and it goes to the minimum with the schedule. The original AdamW paper writes it with a separate schedule multiplier. In an LR sweep with a fixed λ, the decay strength also changes. I report λ and say whether λ or γλ was fixed.
 
-**M4. Is PyTorch Adam exactly Algorithm 1 of the paper?**
+**K4. Is PyTorch Adam exactly Algorithm 1 of the paper?**
 Yes in algebra. The denominator is `sqrt(v)/sqrt(1 − β2^t) + ε`, which is √v̂ + ε. The step size is lr/(1 − β1^t). m is updated with `lerp_`, which gives the same value with different rounding. The paper's faster form, with ε̂ on √v, is not what PyTorch runs.
 
-**M5. What state does Adam keep for each parameter, and in which data type?**
+**K5. What state does Adam keep for each parameter, and in which data type?**
 `step` (a scalar tensor), `exp_avg` and `exp_avg_sq`, plus `max_exp_avg_sq` with AMSGrad. m and v are made with `zeros_like(param)`, so they have the data type of the parameter. With bf16 parameters, the moments are bf16 too. v of small gradients then loses precision. That is why mixed-precision training keeps fp32 master weights and states: 12 of the 16 bytes per weight.
 
-**M6. Where is the step counter, and why does it matter?**
+**K6. Where is the step counter, and why does it matter?**
 `state["step"]` is a tensor. It is on the CPU unless `fused` or `capturable` is set; then it is on the GPU. For CUDA graphs, everything that the step reads must be on the device, so `capturable=True` keeps the step on the GPU. When you resume training, the step must come back with the state. Otherwise bias correction restarts, and the first steps after the resume are wrong.
 
-**M7. Which implementation runs by default on a GPU: for-loop, foreach or fused?**
+**K7. Which implementation runs by default on a GPU: for-loop, foreach or fused?**
 foreach, when all tensors are on CUDA and neither flag is set. Fused is opt-in: the documentation says it is "relatively new" and needs "bake-in time". foreach uses about one extra copy of the parameters in peak memory. `differentiable=True` forces the for-loop path.
 
-**M8. Why would you choose fused, and what do you check first?**
+**K8. Why would you choose fused, and what do you check first?**
 Fused does the whole update in one kernel, so it reads and writes each tensor once. On many small tensors, kernel launches dominate the optimizer time. Before I switch a production run, I check that fused agrees with foreach on a short run to float tolerance, and I check that the data types of all parameters are supported (float64, float32, float16, bfloat16).
 
-**M9. A parameter gets a zero gradient for many steps. Does Adam leave it unchanged?**
+**K9. A parameter gets a zero gradient for many steps. Does Adam leave it unchanged?**
 No. m is not zero, so the weight keeps moving as m decays, and AdamW decay also continues. Only a `None` gradient skips the parameter. `zero_grad()` sets gradients to `None` by default. This matters for embedding rows of rare tokens and for experts in a mixture-of-experts layer that get no tokens.
 
-**M10. Can Adam handle sparse embedding gradients?**
+**K10. Can Adam handle sparse embedding gradients?**
 Not as sparse tensors: `Adam` raises an error and points to `SparseAdam`. In LLMs the embedding gradient is dense with many zero rows. Then the M9 behaviour applies.
 
-**M11. What goes wrong if you load the optimizer state before you make the LR scheduler?**
+**K11. What goes wrong if you load the optimizer state before you make the LR scheduler?**
 The documentation warns that the scheduler then overwrites the loaded learning rates. The run resumes at the wrong LR. The correct order: make the optimizer, make the scheduler, then load both state dicts.
 
-**M12. What do `capturable` and `differentiable` do?**
+**K12. What do `capturable` and `differentiable` do?**
 `capturable=True` makes the step safe for CUDA graph capture; it can be slower without graphs. `differentiable=True` lets autograd go through the step, for example for meta-learning of hyperparameters. Both are off by default, because they cost speed.
 
-**M13. Can the learning rate be a tensor?**
+**K13. Can the learning rate be a tensor?**
 Yes, but the documentation says a tensor LR is not supported in all implementations. Use a float unless you also set `fused=True` or `capturable=True`. A tensor LR on the device lets a CUDA graph change the LR without a new capture.
 
-**M14. How would you verify that a custom or fused optimizer is correct?**
+**K14. How would you verify that a custom or fused optimizer is correct?**
 The part 1 method: fixed gradients, float64, compare m, v, the step and the weight with a reference for several steps, on every code path. Then a short training run with loss and per-layer update ratio compared with the reference run. A silent optimizer bug trains, but trains worse.
 
 ---
 
-## K. Limits to state without being asked
+## L. Limits to state without being asked
 
 1. The models are small (16 M–102 M weights). Each run reads 1.6–2.5 M tokens, far below compute-optimal. The tokenizer is GPT-2, not the V5 tokenizer.
 2. The runs are short (300 steps). Some effects only show in long runs.
@@ -288,7 +288,7 @@ The part 1 method: fixed gradients, float64, compare m, v, the step and the weig
 
 ---
 
-## L. Follow-up questions an interviewer may ask
+## M. Follow-up questions an interviewer may ask
 
 1. Derive the expected value of v_t when g is constant, and show why bias correction makes it exact.
 2. Which condition on β1 and β2 does the convergence analysis in the Adam paper need? (γ = β1²/√β2 < 1.)

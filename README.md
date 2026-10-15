@@ -10,7 +10,7 @@ The model is nanoGPT from [training-loop-diagnostics](https://github.com/jssunil
 |---|---|
 | [PLAN.md](PLAN.md) | Implementation plan: design options for each part, with advantages, disadvantages and the reason for each choice; fairness protocol; compute budget; tests. |
 | [SESSION_11_EXPLAINER.md](SESSION_11_EXPLAINER.md) | Session 11 in depth: Adam, AdamW, bias correction, warmup, cosine and WSD, μP, newer optimizers, fair comparison; 33 checked papers with the key points of each (for the assignment and the interview) and the repos that implement them. |
-| [INTERVIEW_QA.md](INTERVIEW_QA.md) | Principal Architect interview questions and model answers based on this project, including PyTorch `Adam`/`AdamW` internals (section M). |
+| [INTERVIEW_QA.md](INTERVIEW_QA.md) | Principal Architect interview questions and model answers based on this project, including PyTorch `Adam`/`AdamW` internals (section K). |
 
 ## How to run
 
