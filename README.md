@@ -4,6 +4,14 @@ ERA V5 Session 11 assignment: Adam by hand, bias correction, update-to-weight ra
 
 The model is the char-level nanoGPT on Tiny Shakespeare from [training-loop-diagnostics](https://github.com/jssunil/training-loop-diagnostics) (Session 10).
 
+## Documents
+
+| File | Content |
+|---|---|
+| [PLAN.md](PLAN.md) | Implementation plan: design options for each part, with advantages, disadvantages and the reason for each choice; fairness protocol; compute budget; tests. |
+| [SESSION_11_EXPLAINER.md](SESSION_11_EXPLAINER.md) | Session 11 in depth: Adam, AdamW, bias correction, warmup, cosine and WSD, μP, newer optimizers, fair comparison; 33 checked papers and the repos that implement them. |
+| [INTERVIEW_QA.md](INTERVIEW_QA.md) | Principal Architect interview questions and model answers based on this project. |
+
 ## How to run
 
 ```
