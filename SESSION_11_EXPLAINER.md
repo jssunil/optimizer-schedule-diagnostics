@@ -26,8 +26,7 @@ The assignment is a map of the session. Each part makes you prove one idea with 
 4. Read section 5 (warmup) of this document. Do part 3.
 5. Read the WSD section of MiniCPM and the cooldown results of Hägele et al. Do part 4.
 6. Read Tensor Programs V §1–3 (μP). Do part 5.
-7. Answer the questions in [INTERVIEW_QA.md](INTERVIEW_QA.md) without notes.
-8. Read the corrections in section 12. They show where the course notes need care.
+7. Read the corrections in section 12. They show where the course notes need care.
 
 ---
 

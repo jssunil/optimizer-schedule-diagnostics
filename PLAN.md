@@ -7,7 +7,7 @@ This plan uses ASD-STE100 Simplified Technical English rules:
 - A word has one meaning in this document.
 - Each term is defined before it is used.
 
-The task text is in [assignment.md](assignment.md). The theory is in [SESSION_11_EXPLAINER.md](SESSION_11_EXPLAINER.md). Interview practice is in [INTERVIEW_QA.md](INTERVIEW_QA.md).
+The task text is in [assignment.md](assignment.md). The theory is in [SESSION_11_EXPLAINER.md](SESSION_11_EXPLAINER.md).
 
 ---
 

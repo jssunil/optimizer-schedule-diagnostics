@@ -10,7 +10,6 @@ The model is nanoGPT from [training-loop-diagnostics](https://github.com/jssunil
 |---|---|
 | [PLAN.md](PLAN.md) | Implementation plan: design options for each part, with advantages, disadvantages and the reason for each choice; fairness protocol; compute budget; tests. |
 | [SESSION_11_EXPLAINER.md](SESSION_11_EXPLAINER.md) | Session 11 in depth: Adam, AdamW, bias correction, warmup, cosine and WSD, μP, newer optimizers, fair comparison; 33 checked papers with the key points of each (for the assignment and the interview) and the repos that implement them. |
-| [INTERVIEW_QA.md](INTERVIEW_QA.md) | Principal Architect interview questions and model answers based on this project, including PyTorch `Adam`/`AdamW` internals (section K). |
 
 ## How to run
 
@@ -114,7 +113,7 @@ Answer:
 - **Warmup 40:** ρ overshoots near the end of warmup and settles at about step 65, which is 25 steps after warmup ends. The two-line fit (step 8) is wrong here: it finds the first fast rise. Use the rolling-slope value.
 - **ρ / lr** (lower plots) removes the schedule. It falls fast at the start and becomes flat at about step 60 (warmup 40) and about step 150 (warmup 100). After that, ρ follows the LR.
 - **Level:** the block ρ is about 1.7e-2. This is 17 times the 1e-3 guide from Karpathy. The run is short and lr 2e-3 is above the best LR for 300 steps. Thus a high ρ is expected here; it is not a fault.
-- **Embeddings:** the token embedding (wte) has a lower ρ, and it keeps falling. Each step updates only the rows of the tokens in the batch. The position embedding (wpe) is like the blocks.
+- **Embeddings:** the token embedding (wte) has a lower ρ, and it keeps falling. It is tied to the output layer, so its gradient is dense. A probable cause: most rows belong to rare tokens, whose gradients are small and change sign often, so |m̂|/√v̂ is well below 1 for them. This run does not test that cause. The position embedding (wpe) is like the blocks.
 - Gradient clipping at 1.0 acted on 157 and 105 steps (of 300 × 3 seeds).
 
 ## Part 4: Cosine vs WSD, stopped at step 200
