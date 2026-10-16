@@ -1,0 +1,6 @@
+# p3_update_ratio | 2026-10-16 09:12:40 | {"device": "NVIDIA GeForce RTX 5070 Ti", "torch": "2.7.0+cu128", "cuda": "12.8", "python": "3.13.5", "os": "Windows-11-10.0.26300-SP0", "gpu_duty_limit": 0.6, "gpu_mem_fraction": 0.6}
+
+warmup 100: rho stops changing at step 78 (rolling slope) / 70 (two-line fit); per seed [(82, 69), (22, 70), (64, 70)]; median block rho after warmup 1.71e-02; embeddings transformer.wte.weight 8.1e-03, transformer.wpe.weight 2.0e-02; clip events 157
+warmup 40: rho stops changing at step 65 (rolling slope) / 8 (two-line fit); per seed [(49, 8), (56, 8), (66, 9)]; median block rho after warmup 1.66e-02; embeddings transformer.wte.weight 8.5e-03, transformer.wpe.weight 1.9e-02; clip events 105
+
+# finished in 95.7 s

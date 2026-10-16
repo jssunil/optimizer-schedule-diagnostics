@@ -1,0 +1,31 @@
+# p4_cosine_vs_wsd | 2026-10-16 09:14:17 | {"device": "NVIDIA GeForce RTX 5070 Ti", "torch": "2.7.0+cu128", "cuda": "12.8", "python": "3.13.5", "os": "Windows-11-10.0.26300-SP0", "gpu_duty_limit": 0.6, "gpu_mem_fraction": 0.6}
+
+A cosine-300 stopped at 200: LR sweep
+  A lr 3.00e-04: val loss 6.9674 (seeds 6.9631, 6.9650, 6.9742)
+  A lr 6.00e-04: val loss 6.7475 (seeds 6.7530, 6.7406, 6.7489)
+  A lr 1.20e-03: val loss 6.6387 (seeds 6.6422, 6.6369, 6.6371)
+  A lr 2.40e-03: val loss 6.7072 (seeds 6.7031, 6.6488, 6.7696)
+  A lr 4.80e-03: val loss 6.9411 (seeds 6.9905, 6.9165, 6.9164)
+B WSD-300 stopped at 200: LR sweep
+  B lr 3.00e-04: val loss 6.8640 (seeds 6.8590, 6.8619, 6.8710)
+  B lr 6.00e-04: val loss 6.6990 (seeds 6.7003, 6.6977, 6.6989)
+  B lr 1.20e-03: val loss 6.6200 (seeds 6.6227, 6.6217, 6.6156)
+  B lr 2.40e-03: val loss 6.7356 (seeds 6.7323, 6.6665, 6.8081)
+  B lr 4.80e-03: val loss 6.9236 (seeds 7.0103, 6.8558, 6.9047)
+D cosine-200 (known horizon): LR sweep
+  D lr 3.00e-04: val loss 7.1241 (seeds 7.1183, 7.1221, 7.1320)
+  D lr 6.00e-04: val loss 6.8470 (seeds 6.8473, 6.8461, 6.8475)
+  D lr 1.20e-03: val loss 6.7067 (seeds 6.7062, 6.7087, 6.7051)
+  D lr 2.40e-03: val loss 6.7602 (seeds 6.7659, 6.7001, 6.8144)
+  D lr 4.80e-03: val loss 6.9877 (seeds 7.0200, 6.9884, 6.9546)
+C WSD branch: cooldown 160-200: at B's best LR 1.20e-03
+
+Validation loss at step 200 (each arm at its own best peak LR; range = min..max over seeds):
+  C WSD branch: cooldown 160-200   lr 1.20e-03  mean 6.6175  range 6.6144..6.6202
+  B WSD-300 stopped at 200         lr 1.20e-03  mean 6.6200  range 6.6156..6.6227
+  A cosine-300 stopped at 200      lr 1.20e-03  mean 6.6387  range 6.6369..6.6422
+  D cosine-200 (known horizon)     lr 1.20e-03  mean 6.7067  range 6.7051..6.7087
+
+At step 200: A 6.6387, B 6.6200; lower: B (WSD). If step 200 is final, keep the model with the lower loss. If training continues, keep the WSD checkpoint: it continues at its peak LR, and a 40-step cooldown gives arm C (6.6175) with the same compute.
+
+# finished in 503.6 s

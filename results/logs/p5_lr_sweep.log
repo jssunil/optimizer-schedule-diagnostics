@@ -1,0 +1,42 @@
+# p5_lr_sweep | 2026-10-16 09:22:43 | {"device": "NVIDIA GeForce RTX 5070 Ti", "torch": "2.7.0+cu128", "cuda": "12.8", "python": "3.13.5", "os": "Windows-11-10.0.26300-SP0", "gpu_duty_limit": 0.6, "gpu_mem_fraction": 0.6}
+
+width 256: LR sweep
+  d=256 lr 2.50e-04: val loss 6.9542 (seeds 6.9521, 6.9563)
+  d=256 lr 3.54e-04: val loss 6.8153 (seeds 6.8126, 6.8179)
+  d=256 lr 5.00e-04: val loss 6.7116 (seeds 6.7115, 6.7118)
+  d=256 lr 7.07e-04: val loss 6.6355 (seeds 6.6407, 6.6304)
+  d=256 lr 1.00e-03: val loss 6.5778 (seeds 6.5816, 6.5740)
+  d=256 lr 1.41e-03: val loss 6.5349 (seeds 6.5323, 6.5376)
+  d=256 lr 2.00e-03: val loss 6.5319 (seeds 6.5218, 6.5421)
+  d=256 lr 2.83e-03: val loss 6.7380 (seeds 6.7344, 6.7415)
+  d=256 lr 4.00e-03: val loss 6.8021 (seeds 6.7720, 6.8322)
+  width 256: LR* = 1.69e-03
+width 512: LR sweep
+  d=512 lr 2.50e-04: val loss 6.6837 (seeds 6.6859, 6.6814)
+  d=512 lr 3.54e-04: val loss 6.6060 (seeds 6.6100, 6.6020)
+  d=512 lr 5.00e-04: val loss 6.5467 (seeds 6.5485, 6.5448)
+  d=512 lr 7.07e-04: val loss 6.5023 (seeds 6.5017, 6.5029)
+  d=512 lr 1.00e-03: val loss 6.4706 (seeds 6.4771, 6.4641)
+  d=512 lr 1.41e-03: val loss 6.5393 (seeds 6.5454, 6.5332)
+  d=512 lr 2.00e-03: val loss 6.6088 (seeds 6.6011, 6.6166)
+  d=512 lr 2.83e-03: val loss 6.6738 (seeds 6.6541, 6.6936)
+  d=512 lr 4.00e-03: val loss 6.7423 (seeds 6.7513, 6.7333)
+  width 512: LR* = 9.38e-04
+width 1024: LR sweep
+  d=1024 lr 2.50e-04: val loss 6.5537 (seeds 6.5540, 6.5534)
+  d=1024 lr 3.54e-04: val loss 6.5213 (seeds 6.5225, 6.5202)
+  d=1024 lr 5.00e-04: val loss 6.5046 (seeds 6.4962, 6.5131)
+  d=1024 lr 7.07e-04: val loss 6.5065 (seeds 6.4989, 6.5140)
+  d=1024 lr 1.00e-03: val loss 6.5261 (seeds 6.5222, 6.5300)
+  d=1024 lr 1.41e-03: val loss 6.5548 (seeds 6.5472, 6.5624)
+  d=1024 lr 2.00e-03: val loss 6.6248 (seeds 6.6440, 6.6056)
+  d=1024 lr 2.83e-03: val loss 6.7210 (seeds 6.7057, 6.7362)
+  d=1024 lr 4.00e-03: val loss 6.7904 (seeds 6.7752, 6.8057)
+  width 1024: LR* = 5.75e-04
+
+LR* by width: 256: 1.69e-03 [1.6e-03, 1.7e-03], 512: 9.38e-04 [9.2e-04, 9.5e-04], 1024: 5.75e-04 [5.7e-04, 5.8e-04]
+Fit: LR* ~ width^-0.78 (90% bootstrap -0.79..-0.75)
+Prediction at width 4096: 1.92e-04 (90% bootstrap 1.9e-04..2.0e-04)
+Confidence: LOW TO MODERATE: 4096 is 4x outside the measured widths; three points fix a line but do not test it; a real width-4096 model trains on far more tokens (LR* falls with longer training); batch size and depth are fixed here; the embedding is a large share of the weights at small width; the bootstrap covers seed noise only, not these effects.
+
+# finished in 1576.9 s

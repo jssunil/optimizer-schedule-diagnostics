@@ -1,0 +1,26 @@
+# p1_adam_by_hand | 2026-10-16 09:09:10 | {"device": "NVIDIA GeForce RTX 5070 Ti", "torch": "2.7.0+cu128", "cuda": "12.8", "python": "3.13.5", "os": "Windows-11-10.0.26300-SP0", "gpu_duty_limit": 0.6, "gpu_mem_fraction": 0.6}
+
+Adam by hand: theta0 1.0, lr 0.1, betas (0.9, 0.999), eps 1e-08, gradients [0.5, -1.0, 2.0, 0.01, -0.3]
+
+ t      g            m            v        m_hat        v_hat         step        theta
+ 1    0.5   0.05000000   0.00025000   0.50000000   0.25000000  -0.10000000   0.90000000
+ 2   -1.0  -0.05500000   0.00124975  -0.28947368   0.62518759   0.03661035   0.93661035
+ 3    2.0   0.15050000   0.00524850   0.55535055   1.75125075  -0.04196556   0.89464479
+ 4   0.01   0.13645000   0.00524335   0.39677232   1.31280583  -0.03462909   0.86001570
+ 5   -0.3   0.09280500   0.00532811   0.22662450   1.06775506  -0.02193164   0.83808406
+
+for-loop    cpu torch.float64: worst max_abs 1.11e-16 (limit 1e-12) -> PASS
+ foreach cuda:0 torch.float64: worst max_abs 5.55e-17 (limit 1e-12) -> PASS
+   fused cuda:0 torch.float64: worst max_abs 2.22e-16 (limit 1e-12) -> PASS
+for-loop    cpu torch.float32: worst max_rel 5.31e-07 (limit 1e-06) -> PASS
+ foreach cuda:0 torch.float32: worst max_rel 5.31e-07 (limit 1e-06) -> PASS
+   fused cuda:0 torch.float32: worst max_rel 5.31e-07 (limit 1e-06) -> PASS
+
+Weight decay 0.1: L2 (torch Adam) and decoupled (torch AdamW), float64, for-loop path
+  Adam weight_decay=0.1 (L2)           theta after 5 steps 0.8063491134  (torch differs by 1.1e-16)
+  AdamW weight_decay=0.1 (decoupled)   theta after 5 steps 0.7931085539  (torch differs by 1.1e-16)
+  The two thetas differ: L2 goes through m and v and is divided by sqrt(v_hat); decoupled decay does not.
+
+All available paths pass: True
+
+# finished in 0.8 s
