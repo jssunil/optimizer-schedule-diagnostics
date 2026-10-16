@@ -27,6 +27,7 @@ The assignment is a map of the session. Each part makes you prove one idea with 
 5. Read the WSD section of MiniCPM and the cooldown results of Hägele et al. Do part 4.
 6. Read Tensor Programs V §1–3 (μP). Do part 5.
 7. Read the corrections in section 12. They show where the course notes need care.
+8. After the runs, read section 16. It explains each result with the papers.
 
 ---
 
@@ -57,7 +58,7 @@ $$\theta_t = \theta_{t-1} - \eta \frac{\hat m_t}{\sqrt{\hat v_t} + \epsilon}$$
 - v measures the typical gradient size. It averages over about 1/(1 − β2) steps.
 - The step is m̂/√v̂. This ratio is about ±1 when the gradient has a steady sign, and smaller when the sign changes often.
 
-**The step size does not depend on the gradient scale.** If all gradients are multiplied by 100, m̂/√v̂ does not change. Thus, η sets the step in weight units directly. This is why the update-to-weight ratio in part 3 follows η so closely.
+**The step size does not depend on the gradient scale.** If all gradients are multiplied by 100, m̂/√v̂ does not change. Thus, η sets the step in weight units directly. This is why the update-to-weight ratio in part 3 grows with η during warmup. It does not follow η exactly: ρ/η fell from 96 to 8 in part 3 (section 16.2).
 
 ### 3.2 Bias correction
 
@@ -121,7 +122,7 @@ Decay 2-D weight matrices only. Do not decay biases, LayerNorm or RMSNorm gains.
 
 ### 4.4 What weight decay really does in LLMs
 
-In a long pretraining run, the model sees each token about once. Overfitting is not the main problem. Kosson et al. (2023) show a different role: with normalization layers, weight decay and the gradient updates reach a balance. The weight norm becomes stable, and each update rotates the weight by a stable angle. For AdamW they give this equilibrium angle as about √(2ηλ) per step. Thus, η and λ together set the effective learning speed of each layer. This is why part 3 sees ρ settle after warmup.
+In a long pretraining run, the model sees each token about once. Overfitting is not the main problem. Kosson et al. (2023) show a different role: with normalization layers, weight decay and the gradient updates reach a balance. The weight norm becomes stable, and each update rotates the weight by a stable angle. For AdamW they give this equilibrium angle as √(2ηλ·(1 − β1)/(1 + β1)) per step (their Table 1). Thus, η and λ together set the effective learning speed of each layer. The equilibrium takes about 1/(2ηλ) steps to form: 2,500 steps in part 3. Thus the 300-step runs of part 3 do not reach it (section 16.2).
 
 ### 4.5 PyTorch `Adam` and `AdamW`: the exact update that the code runs
 
@@ -214,7 +215,7 @@ The views do not agree on the cause. They agree on the practical result: warmup 
 
 ### 5.3 Warmup and the update-to-weight ratio
 
-During warmup, the update is about η_t times a value near 1 per element. Thus, ρ = ‖ΔW‖/‖W‖ grows with η_t. After warmup, ρ moves toward its equilibrium value. Part 3 measures this.
+During warmup, the update is about η_t times a value near 1 per element. Thus, ρ = ‖ΔW‖/‖W‖ grows with η_t. Then the gradient becomes mostly noise, and the per-element step falls toward 0.23·η_t (Kosson et al.). The equilibrium value comes much later, after about 1/(2ηλ) steps. Part 3 measures the first two phases (section 16.2).
 
 A guide value is ρ ≈ 1e-3 per step (Karpathy, cs231n). Layers far above it can be unstable. Layers far below it learn slowly. Muon and Moonlight (Liu et al., 2025) set the update size of each matrix on purpose, to match the per-element RMS of AdamW.
 
@@ -246,7 +247,7 @@ DeepSeek LLM (2024) uses a similar multi-step schedule: η drops in two steps ne
 
 Wen et al. (2024) describe a "river valley" loss surface. The valley is steep on the sides and nearly flat along the river. At a high η, the model moves fast along the river but bounces between the sides. The loss looks high. In the decay phase, the bounce stops and the model drops to the river floor. The loss falls fast. Thus, a high stable-phase loss does not mean bad progress. The progress is hidden until the decay.
 
-This explains the step-200 result of part 4. WSD at step 200 is still bouncing. Its loss is higher, but its position along the river can be as good or better.
+Before the run I expected this to make WSD worse at step 200, because it is still bouncing. The run showed the opposite: WSD was better. Early in training, the distance along the river matters more than the bounce. Section 16.3 explains this with Wen et al.'s theorems.
 
 ### 6.4 Decay to where?
 
@@ -414,13 +415,16 @@ Articles: Karpathy, "A Recipe for Training Neural Networks" (2019 blog); Stanfor
 32. Vyas et al. *SOAP: Improving and Stabilizing Shampoo using Adam.* arXiv:2409.11321 (2024).
 33. Liu et al. *Muon is Scalable for LLM Training.* arXiv:2502.16982 (2025).
 
+**Added after the runs**
+34. Bjorck et al. *Scaling Optimal LR Across Token Horizons.* arXiv:2409.19913 (ICLR 2025). Part 5: the best LR falls with the number of training tokens (section 16.4).
+
 **Priority for 16 Oct:** see section 15 (reading order).
 
 ---
 
 ## 14. Key points from each paper
 
-For each paper: the **key points**, the **use** in the assignment (P1–P5 = part 1 to part 5) or in the session, and one **interview line** that you can say aloud. The key points come from the paper abstracts (checked on arxiv.org) and the main results. The numbers match the paper numbers in section 13.
+For each paper: the **key points**, the **use** in the assignment (P1–P5 = part 1 to part 5) or in the session, and the **key takeaway**. The key points come from the paper abstracts (checked on arxiv.org) and the main results. The numbers match the paper numbers in section 13.
 
 ### 14.1 Adam and AdamW
 
@@ -431,7 +435,7 @@ For each paper: the **key points**, the **use** in the assignment (P1–P5 = par
 - §2 also gives a faster form of the step with a different ε̂.
 - Defaults: η = 0.001, β1 = 0.9, β2 = 0.999, ε = 1e-8. The paper also gives AdaMax (infinity norm).
 - **Use:** P1 (the formulas), P2 (bias correction), P3 (scale invariance explains why ρ follows η).
-- **Interview line:** "Adam normalizes each weight's step by its own gradient size, so η sets the step in weight units."
+- **Key takeaway:** "Adam normalizes each weight's step by its own gradient size, so η sets the step in weight units."
 
 **2. AdamW (Loshchilov and Hutter, 2017)**
 - L2 regularization and weight decay are the same for SGD, but not for Adam.
@@ -439,14 +443,14 @@ For each paper: the **key points**, the **use** in the assignment (P1–P5 = par
 - Decoupled weight decay makes the best λ almost independent of the best η.
 - It made Adam competitive with SGD with momentum on image classification.
 - **Use:** the default optimizer in P3–P5; the decay groups (2-D weights only).
-- **Interview line:** "AdamW decays each weight at the same rate; Adam with L2 decays weights with small gradients more."
+- **Key takeaway:** "AdamW decays each weight at the same rate; Adam with L2 decays weights with small gradients more."
 
 **3. On the Convergence of Adam and Beyond (Reddi et al.)**
 - The exponential moving average in v has a short memory. This can make Adam fail to converge.
 - The paper gives a simple convex problem where Adam does not converge, and shows the error in the old proof.
 - The fix is a "long-term memory" of v (AMSGrad).
 - **Use:** session theory; context for β2 choice.
-- **Interview line:** "Adam has a known convergence counter-example; AMSGrad fixes the proof, but LLM practice did not change."
+- **Key takeaway:** "Adam has a known convergence counter-example; AMSGrad fixes the proof, but LLM practice did not change."
 
 ### 14.2 Warmup and the size of the update
 
@@ -455,21 +459,21 @@ For each paper: the **key points**, the **use** in the assignment (P1–P5 = par
 - A gradual warmup is necessary, or large-batch training fails early.
 - Result: ResNet-50, batch 8,192, 256 GPUs, one hour, same accuracy.
 - **Use:** the origin of warmup; session section on batch size.
-- **Interview line:** "Warmup started as the fix that made the linear scaling rule work for large batches."
+- **Key takeaway:** "Warmup started as the fix that made the linear scaling rule work for large batches."
 
 **5. RAdam (Liu et al., 2019)**
 - Early in training, the adaptive LR of Adam has a very large variance, because v̂ uses few samples.
 - Warmup acts as variance reduction.
 - RAdam adds a term that rectifies this variance.
 - **Use:** P3 (why warmup exists); compare with paper 6.
-- **Interview line:** "RAdam says warmup reduces the variance of the early adaptive step."
+- **Key takeaway:** "RAdam says warmup reduces the variance of the early adaptive step."
 
 **6. On the adequacy of untuned warmup (Ma and Yarats, 2019)**
 - The paper refutes the RAdam analysis. The real cause is the large size of the early update.
 - Simple untuned warmup gives about the same results as RAdam.
 - Rule of thumb: linear warmup over 2/(1 − β2) steps.
 - **Use:** P3 second arm (40-step warmup for β2 = 0.95).
-- **Interview line:** "Linear warmup for 2/(1 − β2) steps is a good default; for β2 = 0.95 that is only 40 steps."
+- **Key takeaway:** "Linear warmup for 2/(1 − β2) steps is a good default; for β2 = 0.95 that is only 40 steps."
 
 **7. Why Warmup the Learning Rate? (Kalra and Barkeshli, 2024)**
 - The main gain of warmup: the network tolerates a larger target η.
@@ -477,15 +481,15 @@ For each paper: the **key points**, the **use** in the assignment (P1–P5 = par
 - Behaviour depends on the start: progressive sharpening or sharpness reduction. This depends on the initialization and the parameterization.
 - A good η_init (from the "loss catapult") can save warmup steps. An initialization of Adam's v can give the warmup benefit.
 - **Use:** P3 interpretation; P4 and P5 (a larger usable peak η).
-- **Interview line:** "Warmup does not mainly help the start; it makes a higher peak LR stable."
+- **Key takeaway:** "Warmup does not mainly help the start; it makes a higher peak LR stable."
 
 **8. Rotational Equilibrium (Kosson et al., 2023)**
 - Weight decay makes the size and the angle of each neuron's update reach a steady state.
 - In this state, the average rotation is balanced across layers and neurons. Rotation is a proxy for the effective LR.
 - This explains why AdamW works better than Adam with L2.
 - Direct control of the rotation reduces the need for warmup.
-- **Use:** P3 (why ρ settles after warmup).
-- **Interview line:** "With weight decay, every layer reaches a steady rotation per step; η and λ together set it."
+- **Use:** P3 (the expected ρ level, and the time to equilibrium: about 1/(2ηλ) steps, longer than the part 3 runs).
+- **Key takeaway:** "With weight decay, every layer reaches a steady rotation per step; η and λ together set it."
 
 ### 14.3 Schedules and weight averaging
 
@@ -494,7 +498,7 @@ For each paper: the **key points**, the **use** in the assignment (P1–P5 = par
 - It improves the "anytime" performance of SGD.
 - This paper made the cosine shape popular.
 - **Use:** P4 (the cosine formula).
-- **Interview line:** "Cosine came from SGDR; LLMs kept the cosine and dropped the restarts."
+- **Key takeaway:** "Cosine came from SGDR; LLMs kept the cosine and dropped the restarts."
 
 **10. MiniCPM (Hu et al., 2024)**
 - Introduces the WSD schedule. It supports continuous training and domain adaptation.
@@ -502,7 +506,7 @@ For each paper: the **key points**, the **use** in the assignment (P1–P5 = par
 - With WSD, they study the data–model scaling law without many retraining runs.
 - They find a compute-optimal tokens-per-parameter ratio much higher than Chinchilla.
 - **Use:** P4 (WSD); P5 (wind tunnel idea for the 4096 prediction).
-- **Interview line:** "WSD lets one run produce models at many lengths, so scaling laws need fewer runs."
+- **Key takeaway:** "WSD lets one run produce models at many lengths, so scaling laws need fewer runs."
 
 **11. Scaling Laws Beyond Fixed Training Durations (Hägele et al., 2024)**
 - The cosine schedule makes scaling research complex: each length needs a new run.
@@ -510,22 +514,22 @@ For each paper: the **key points**, the **use** in the assignment (P1–P5 = par
 - Stochastic weight averaging improves the model along the trajectory with no extra training cost.
 - Reusable runs reduce the compute for scaling experiments.
 - **Use:** P4 (arm C, the cooldown branch); code in `epfml/schedules-and-scaling`.
-- **Interview line:** "Constant LR plus a short cooldown matches cosine and makes runs reusable."
+- **Key takeaway:** "Constant LR plus a short cooldown matches cosine and makes runs reusable."
 
 **12. River Valley view of WSD (Wen et al., 2024)**
 - WSD gives an unusual loss curve: high in the stable phase, a sharp drop in the decay.
 - "River valley" landscape: at high η, the model oscillates between the walls but moves fast along the river.
 - The decay removes the oscillation and shows the real progress. Both phases are necessary.
 - WSD-S: resume from a decayed checkpoint and keep one main branch. It beat WSD and cyclic cosine at 0.1–1.2 B weights.
-- **Use:** P4 (why WSD loses at step 200 but is not worse).
-- **Interview line:** "The stable phase makes hidden progress along the river; the decay makes it visible."
+- **Use:** P4 (the loss is a distance term set by the sum of η, plus a noise term set by the current η; section 16.3).
+- **Key takeaway:** "The stable phase makes hidden progress along the river; the decay makes it visible."
 
 **13. DeepSeek LLM (DeepSeek-AI, 2024)**
 - 7 B and 67 B models, 2 T tokens.
 - Uses a multi-step LR schedule instead of cosine, so that training stages can be reused.
 - Fits scaling laws for the best batch size and LR as functions of the compute budget.
 - **Use:** P4 (WSD-like schedules in production); P5 (LR depends on scale).
-- **Interview line:** "DeepSeek uses a step schedule for reuse and fits the best LR and batch to the compute budget."
+- **Key takeaway:** "DeepSeek uses a step schedule for reuse and fits the best LR and batch to the compute budget."
 
 **14. Straight to Zero (Bergsma et al., 2025)**
 - Under the best peak LR, linear decay to zero (D2Z) beats cosine to 10% at compute-optimal data sizes.
@@ -533,7 +537,7 @@ For each paper: the **key points**, the **use** in the assignment (P1–P5 = par
 - AdamW acts like an exponential moving average of weight updates. D2Z balances early movement and late averaging.
 - Example: a 610 M model at 80 tokens per parameter with D2Z beat 200 tokens per parameter with 10× decay (about 60% compute saved).
 - **Use:** P4 (η_min choice); a correction to the course notes.
-- **Interview line:** "Decay to zero, not to 10%; at scale it can save more than half the compute."
+- **Key takeaway:** "Decay to zero, not to 10%; at scale it can save more than half the compute."
 
 **15. The Road Less Scheduled (Defazio et al., 2024)**
 - Schedules that do not need the stop step T usually lose to schedules that need it.
@@ -541,14 +545,14 @@ For each paper: the **key points**, the **use** in the assignment (P1–P5 = par
 - No extra hyperparameters over momentum optimizers.
 - Schedule-Free AdamW won the AlgoPerf 2024 self-tuning track.
 - **Use:** session alternative to WSD when T is unknown.
-- **Interview line:** "Schedule-free training replaces the schedule with averaging; it won AlgoPerf self-tuning."
+- **Key takeaway:** "Schedule-free training replaces the schedule with averaging; it won AlgoPerf self-tuning."
 
 **16. LAWA, Early Weight Averaging (Sanyal et al., 2023)**
 - Averaging checkpoints along the run improves convergence and generalization early.
 - The gain is larger at a high LR, and larger when the checkpoints are far apart.
 - It beat EMA and SWA. Tested on nanoGPT-2 (125 M–770 M) and Pythia (1 B–12 B).
 - **Use:** session section on EMA; a cheap way to judge WSD stable-phase progress.
-- **Interview line:** "Averaging spaced checkpoints at high LR gives a better model for free."
+- **Key takeaway:** "Averaging spaced checkpoints at high LR gives a better model for free."
 
 ### 14.4 Scale, width and batch size
 
@@ -557,14 +561,14 @@ For each paper: the **key points**, the **use** in the assignment (P1–P5 = par
 - Width and depth have small effects within a wide range.
 - Larger models are more sample-efficient.
 - **Use:** P5 background (LR depends on model size).
-- **Interview line:** "Loss is a power law in size, data and compute; the shape of the model matters much less."
+- **Key takeaway:** "Loss is a power law in size, data and compute; the shape of the model matters much less."
 
 **18. Chinchilla (Hoffmann et al., 2022)**
 - For compute-optimal training, scale model size and tokens equally: double one, double the other.
 - Large models of that time were undertrained. Chinchilla (70 B, 4× more data) beat Gopher (280 B).
 - A cosine cycle longer than the run gives a worse model.
 - **Use:** P4 (the cosine horizon must match the run); P5 (2.5 M tokens is far below compute-optimal).
-- **Interview line:** "Cosine must match the run length; that is the problem WSD removes."
+- **Key takeaway:** "Cosine must match the run length; that is the problem WSD removes."
 
 **19. Tensor Programs V, μP and μTransfer (Yang et al., 2022)**
 - In μP, many best hyperparameters stay stable when the model size changes.
@@ -572,7 +576,7 @@ For each paper: the **key points**, the **use** in the assignment (P1–P5 = par
 - Results: from 13 M to beat BERT-large; from 40 M to beat the 6.7 B GPT-3 at 7% of its pretraining cost.
 - Code: `microsoft/mup`.
 - **Use:** P5 (the production fix for the 4096 prediction).
-- **Interview line:** "With μP, I tune at small width and transfer the LR to the large model."
+- **Key takeaway:** "With μP, I tune at small width and transfer the LR to the large model."
 
 **20. Scaling Exponents Across Parameterizations and Optimizers (Everett et al., 2024)**
 - Tens of thousands of models, up to 26.8 B weights, three optimizers, four parameterizations.
@@ -580,7 +584,7 @@ For each paper: the **key points**, the **use** in the assignment (P1–P5 = par
 - Adam's ε must scale correctly with width, or gradients underflow.
 - Adam-atan2 removes ε.
 - **Use:** P5 (per-layer LR; ε at large width); P1 (ε position).
-- **Interview line:** "Per-layer LR is the key to transfer, and ε must be scaled or removed at large width."
+- **Key takeaway:** "Per-layer LR is the key to transfer, and ε must be scaled or removed at large width."
 
 **21. Small-scale proxies for instabilities (Wortsman et al., 2023)**
 - Large-scale instabilities also appear in small models at high LR. Examples: attention logit growth, output logit divergence.
@@ -589,20 +593,20 @@ For each paper: the **key points**, the **use** in the assignment (P1–P5 = par
 - Warmup, weight decay and μP reduce LR sensitivity.
 - Some instabilities can be predicted from the growth of activation and gradient norms.
 - **Use:** P5 (the LR sweep is a sensitivity curve); Session 15 link.
-- **Interview line:** "I study instabilities on small proxies at high LR before I pay for a large run."
+- **Key takeaway:** "I study instabilities on small proxies at high LR before I pay for a large run."
 
 **22. An Empirical Model of Large-Batch Training (McCandlish et al., 2018)**
 - The gradient noise scale predicts the largest useful batch size.
 - The noise scale grows as the loss goes down during training.
 - It explains the trade-off between compute efficiency and time efficiency.
 - **Use:** session section on batch size; batch choice in P4 and P5.
-- **Interview line:** "Above the critical batch, more batch buys wall time, not fewer tokens."
+- **Key takeaway:** "Above the critical batch, more batch buys wall time, not fewer tokens."
 
 **23. SDEs and Scaling Rules for Adaptive Algorithms (Malladi et al., 2022)**
 - Gives proven SDE approximations for RMSprop and Adam.
 - Practical result: a square-root scaling rule for Adam when the batch size changes.
 - **Use:** session section on batch size.
-- **Interview line:** "For Adam, scale the LR with the square root of the batch, not linearly."
+- **Key takeaway:** "For Adam, scale the LR with the square root of the batch, not linearly."
 
 ### 14.5 Fair comparison
 
@@ -611,7 +615,7 @@ For each paper: the **key points**, the **use** in the assignment (P1–P5 = par
 - With enough tuning, a more general optimizer never loses to a special case of itself (Adam ≥ momentum ≥ SGD).
 - In their tests, adaptive methods never lost to momentum or SGD.
 - **Use:** the "tune both sides" rule of the assignment (P4, P5).
-- **Interview line:** "Most optimizer rankings are rankings of tuning budgets."
+- **Key takeaway:** "Most optimizer rankings are rankings of tuning budgets."
 
 **25. Descending through a Crowded Valley (Schmidt et al., 2020)**
 - 15 optimizers, more than 50,000 runs.
@@ -619,20 +623,20 @@ For each paper: the **key points**, the **use** in the assignment (P1–P5 = par
 - Trying several optimizers with defaults works about as well as tuning one optimizer.
 - No optimizer clearly beat Adam.
 - **Use:** fairness section; P4 tuning budget.
-- **Interview line:** "Across 50,000 runs, Adam stayed a strong default; no newer method beat it consistently."
+- **Key takeaway:** "Across 50,000 runs, Adam stayed a strong default; no newer method beat it consistently."
 
 **26. AlgoPerf (Dahl et al., 2023)**
 - Three problems in optimizer comparisons: when training is complete, sensitivity to workload details, and fair tuning.
 - AlgoPerf is a time-to-result benchmark on fixed hardware with several workloads and workload variants.
 - **Use:** the method behind the fairness protocol (PLAN.md section 10).
-- **Interview line:** "Compare time to a target result on fixed hardware, with a fixed tuning rule."
+- **Key takeaway:** "Compare time to a target result on fixed hardware, with a fixed tuning rule."
 
 **27. No Train No Gain (Kaddour et al., 2023)**
 - Tested layer stacking, layer dropping, selective backprop, RHO loss, Lion and Sophia on BERT and T5.
 - With a fixed compute budget, the gains disappeared against a baseline with a fully decayed LR.
 - Introduces "reference system time" to compare across machines.
 - **Use:** P4 (always compare with a fully decayed baseline: arm D).
-- **Interview line:** "Many speed-up claims vanish when the baseline schedule is fully decayed."
+- **Key takeaway:** "Many speed-up claims vanish when the baseline schedule is fully decayed."
 
 **28. Deconstructing What Makes a Good Optimizer (Zhao et al., 2024)**
 - Compared SGD, Adafactor, Adam, Lion and Sophia on language models.
@@ -640,7 +644,7 @@ For each paper: the **key points**, the **use** in the assignment (P1–P5 = par
 - Choose by practical needs: memory and ease of use.
 - Signed momentum recovers Adam's performance. Adaptivity in the last layer and in LayerNorm is necessary for stability.
 - **Use:** session section 2; P3 (layers behave differently).
-- **Interview line:** "Optimizer choice is mostly a memory and engineering decision; adaptivity matters most in the last layer and the norms."
+- **Key takeaway:** "Optimizer choice is mostly a memory and engineering decision; adaptivity matters most in the last layer and the norms."
 
 ### 14.6 Other optimizers
 
@@ -649,28 +653,28 @@ For each paper: the **key points**, the **use** in the assignment (P1–P5 = par
 - When β2 decays too slowly, adaptive methods give updates that are too large. Fixes: update clipping and an increasing β2 schedule.
 - Scales the update by the size of the weight.
 - **Use:** session β2 discussion (why β2 = 0.999 can be dangerous); memory options.
-- **Interview line:** "Adafactor saves the v memory and showed that a slow β2 makes oversized updates."
+- **Key takeaway:** "Adafactor saves the v memory and showed that a slow β2 makes oversized updates."
 
 **30. 8-bit Optimizers (Dettmers et al., 2021)**
 - Stores optimizer state in 8 bits with block-wise dynamic quantization.
 - A "stable embedding layer" reduces the gradient variance from non-uniform token frequencies.
 - Same results as 32-bit states on 1.5 B language models and other tasks, with a two-line code change.
 - **Use:** memory section; frugal-budget design.
-- **Interview line:** "8-bit states cut optimizer memory by about 75% with no change in hyperparameters."
+- **Key takeaway:** "8-bit states cut optimizer memory by about 75% with no change in hyperparameters."
 
 **31. Lion (Chen et al., 2023)**
 - Found by program search. Lion keeps only momentum and uses the sign of the update.
 - Every weight gets an update of the same size. Thus, Lion needs a smaller η than Adam.
 - The gain grows with the batch size. On language modeling, Lion was similar to or better than Adam.
 - **Use:** memory section; an example for fair-comparison questions.
-- **Interview line:** "Lion halves optimizer memory; use a 3–10× smaller LR and a larger weight decay."
+- **Key takeaway:** "Lion halves optimizer memory; use a 3–10× smaller LR and a larger weight decay."
 
 **32. SOAP (Vyas et al., 2024)**
 - Shampoo (power 1/2) equals Adafactor in Shampoo's eigenbasis.
 - SOAP runs Adam in that eigenbasis. It has one extra hyperparameter: the preconditioning frequency.
 - At 360 M and 660 M, large batch: more than 40% fewer iterations and more than 35% less wall time than AdamW.
 - **Use:** session section on newer optimizers.
-- **Interview line:** "SOAP is Adam in a rotated basis; it cuts steps by about 40% at large batch."
+- **Key takeaway:** "SOAP is Adam in a rotated basis; it cuts steps by about 40% at large batch."
 
 **33. Muon is Scalable (Liu et al., 2025)**
 - Muon orthogonalizes the momentum of each weight matrix.
@@ -678,7 +682,7 @@ For each paper: the **key points**, the **use** in the assignment (P1–P5 = par
 - Scaling-law runs: about 2× compute efficiency over AdamW at compute-optimal training.
 - Moonlight: a 3 B/16 B MoE trained on 5.7 T tokens with Muon.
 - **Use:** P3 (per-element update RMS as an extra metric); frugal-budget design.
-- **Interview line:** "Muon needed weight decay and update-scale matching to work at scale; then it gave about 2×."
+- **Key takeaway:** "Muon needed weight decay and update-scale matching to work at scale; then it gave about 2×."
 
 ### 14.7 Ten points to remember for the interview
 
@@ -686,7 +690,7 @@ For each paper: the **key points**, the **use** in the assignment (P1–P5 = par
 2. Without bias correction, the step error is r(t) = (1 − β1^t)/√(1 − β2^t). It does not depend on the gradients. (1)
 3. AdamW decouples λ from η; decay only 2-D weights. (2, 28)
 4. Warmup makes a higher peak η stable. Use about 2/(1 − β2) steps as a start. (6, 7)
-5. Weight decay sets a steady update rotation per layer. (8)
+5. Weight decay sets a steady update rotation per layer, after about 1/(2ηλ) steps. (8)
 6. Cosine must match the run length; WSD does not need it. (11, 18)
 7. The WSD stable phase hides progress; the decay shows it. (12)
 8. Decay to zero often beats decay to 10%. (14)
@@ -710,7 +714,7 @@ For each paper: the **key points**, the **use** in the assignment (P1–P5 = par
 | 6 | Ma and Yarats, untuned warmup, arXiv:1910.04209 | It gives the warmup rule for part 3. | The introduction refutes the RAdam explanation. The conclusion gives the rule: linear warmup over 2/(1 − β2) steps. |
 | 10 | MiniCPM, arXiv:2404.06395 | It introduced WSD. | **Exception.** The introduction and conclusion are about small models. Read the abstract, then go directly to the WSD section and its loss curves. |
 | 11 | Hägele et al., arXiv:2405.18392 | Constant η with a cooldown matches cosine (part 4, arm C). | The introduction tells why cosine makes scaling research expensive. The conclusion gives the cooldown length and the weight-averaging result. |
-| 12 | Wen et al., river valley, arXiv:2410.05192 | It explains why WSD loses at step 200 but is not worse. | The first pages have the river-valley figure. This is the key picture. The conclusion gives WSD-S. |
+| 12 | Wen et al., river valley, arXiv:2410.05192 | It explains why WSD beat cosine at step 200 (section 16.3). | The first pages have the river-valley figure. This is the key picture. The conclusion gives WSD-S. |
 | 19 | μP, Tensor Programs V, arXiv:2203.03466 | It answers the width-4096 question of part 5. | The first pages show the plot of η against width: SP moves, μP stays. That plot is a small copy of your part 5 result. The conclusion gives the cost savings. |
 | 24 | Choi et al., arXiv:1910.05446 | It is the source of the "tune both sides" rule. | The introduction says that the search space decides the ranking. The conclusion gives practical tuning advice. |
 
@@ -719,7 +723,7 @@ For each paper: the **key points**, the **use** in the assignment (P1–P5 = par
 | No. | Paper | Why |
 |---|---|---|
 | 7 | Kalra and Barkeshli, arXiv:2406.09405 | The real gain of warmup is a stable higher peak η. |
-| 8 | Kosson et al., arXiv:2305.17212 | It explains why ρ settles after warmup (part 3). |
+| 8 | Kosson et al., arXiv:2305.17212 | It explains the ρ level and the step-1 value of part 3 (section 16.2). |
 | 14 | Bergsma et al., arXiv:2502.15938 | Decay to zero beats decay to 10%. |
 | 27 | Kaddour et al., arXiv:2307.06440 | Speed-up claims disappear against a fully decayed baseline. |
 | 20 | Everett et al., arXiv:2407.05872 | Per-layer η, and the ε problem at large width. |
@@ -743,3 +747,122 @@ Papers 3, 4, 5, 9, 13, 15–18, 22, 23, 25, 26, 28–33. The key points in secti
 | 10:45–11:15 | MiniCPM WSD section (10), then the Hägele et al. introduction (11). |
 | 15:30–16:00 | μP first pages (19). |
 | After the form | Ma and Yarats (6), Wen et al. (12), Choi et al. (24): about 75 minutes. |
+
+---
+
+## 16. What the results show, explained with the papers
+
+This section explains the results of the full run (16 Oct 2026; tables in the [README](README.md)) with the full text of six papers. I read the theorems, tables and figures named below, not only the abstracts. Where a value is my calculation from a paper's formula, the text says so.
+
+| Paper | Number in section 13 | Parts of the paper used |
+|---|---|---|
+| Wen et al., river valley | 12 | Theorems 3.4 and 3.5; Figure 6; the WSD-S ablations |
+| Hägele et al., beyond fixed durations | 11 | Figures 1, 3, 5 and 6; Takeaways 1–5 |
+| Kosson et al., rotational equilibrium | 8 | Table 1; equations 16, 18 and 21; section 5.2; Figure 5 |
+| Kalra and Barkeshli, why warmup | 7 | Sections 1 and 5; GI-Adam (section 6) |
+| Everett et al., scaling exponents | 20 | Table 1; sections 4.1 and 4.2; Table 3 |
+| Bjorck et al., optimal LR across token horizons | 34 | Equations 1–4; Table 1; sections 3.3 and 3.4 |
+
+### 16.1 Part 2: bias correction "off" is an anti-warmup
+
+**Result.** With β2 = 0.95, "off" changed the loss at step 300 by only 0.035. With β2 = 0.999, "off" made the loss 0.64 worse.
+
+**Explanation.** Without correction, the step is multiplied by r(t) = (1 − β1^t)/√(1 − β2^t). The two factors act in opposite directions:
+- (1 − β1^t) makes the early steps smaller. It is near 1 after about 1/(1 − β1) = 10 steps.
+- 1/√(1 − β2^t) makes the early steps larger. It is near 1 only after many multiples of 1/(1 − β2) steps: 20 steps for β2 = 0.95, 1,000 steps for β2 = 0.999.
+
+With β2 = 0.95 the two factors almost cancel (r between 0.45 and 1.10). With β2 = 0.999 the second factor wins for thousands of steps (r between 2 and 6.6 in this run). That is a step size 2–6.6× too large at the start of training, with no warmup.
+
+**Paper link.** Kalra and Barkeshli (sections 1 and 5) find that the pre-conditioned sharpness of Adam is high at the start. Large early steps then cause instabilities, and Adam's moments can keep the effect for many steps. Their GI-Adam sets v0 = g0². Then no bias correction is necessary, and the update equals Adam with an automatic warmup η_t = η·√(1 − β2^t) (section 6). Without the correction of v, Adam multiplies the step by 1/√(1 − β2^t), the exact inverse. Thus "bias correction off" is an anti-warmup. This is why it hurt so much with β2 = 0.999.
+
+**Why "off" was slightly better with β2 = 0.95.** The run used η = 1e-3. Part 5 found a best η of about 1.7e-3 for this model. "Off" made steps 10 to 60 up to 1.10× larger, which moved the run toward the best η. This is a hypothesis; a run at η = 1.7e-3 would test it.
+
+### 16.2 Part 3: why ρ settles, and why its level is 1.7e-2
+
+**Result.** ρ/η of the median block matrix was 95.6 at step 1. It fell to about 8 by step 100 and then stayed flat. The level after warmup was ρ ≈ 1.7e-2, 17× the 1e-3 guide.
+
+**Step 1 is exact.** At t = 1, m̂/√v̂ = sign(g) for each element (ε ignored). Thus each element moves by exactly η, and ρ/η = 1/σ, where σ is the RMS of the initial weights. nanoGPT uses σ = 0.02 for most matrices and 0.02/√(2·n_layer) = 0.0071 for the c_proj matrices. The median of 8 values of 1/0.02 = 50 and 8 values of 1/0.0071 = 141 is 95.7. The measurement is 95.6.
+
+**Why ρ/η falls.** Kosson et al. (equation 21) give the RMS of Adam's update per element when the gradient is mostly noise. It is η·√((1 − β1)/(1 + β1)) = 0.23η for β1 = 0.9. When the gradient is consistent, it is near η. At the start the gradient is consistent; later it is mostly noise. Thus the per-element step falls from about η to about 0.23η. The weights also grow. Both reduce ρ/η. If the step were pure noise, ρ/η = 8 would mean a weight RMS of about 0.23/8 ≈ 0.029. This is my estimate; the run did not log the weight RMS.
+
+Kosson et al. derive these values for weights whose output does not depend on their scale (scale-invariant weights). Transformer matrices are not exactly scale-invariant, but the paper finds that the predictions are still often close (section 5.1).
+
+**What "ρ stops changing" means here.** It is the end of this fall: the Adam step becomes noise-dominated. It is not rotational equilibrium. Kosson et al. (equations 16–17) show that the weight norm approaches equilibrium as (1 − 2ηλ)^t. The time constant is 1/(2ηλ) = 2,500 steps for η = 2e-3 and λ = 0.1. The run had 300 steps, so it stayed in the transient phase.
+
+**Why the level is above the guide.** Kosson et al. (Table 1) give the AdamW equilibrium rotation per step as √(2ηλ·(1 − β1)/(1 + β1)). My calculation for this run gives 4.6e-3, and an equilibrium weight RMS of √(η/(2λ)) = 0.1 per element. The weights started at 0.02, far below 0.1. Section 5.2 of the paper explains that weights below their equilibrium norm rotate faster than at equilibrium. Thus 1.7e-2 is expected for a 300-step run from this initialization. The same formula with typical LLM values (η = 3e-4, λ = 0.1) gives 1.8e-3. That is near the 1e-3 guide. The guide describes long runs near equilibrium.
+
+**Warmup length.** Kalra and Barkeshli (section 5) find that the main gain of warmup is a higher usable peak η. For a fixed peak η, a longer warmup gives only a small further gain. Kosson et al. (Figure 5) show that warmup also calms the transient phase. Part 3 agrees: after warmup, the 40-step and 100-step runs reached the same ρ (1.66e-2 and 1.71e-2). The 40-step run had a short overshoot near the end of warmup.
+
+### 16.3 Part 4: two quantities decide the loss at step 200
+
+**Theory.** Wen et al. (Theorems 3.4 and 3.5) show that, on a river-valley loss, the expected loss after k steps is approximately
+
+$$\mathbb{E}[L_k] \approx L_{river}\Big(T_0 + \sum_{i \le k} \eta_i\Big) + \frac{(d-1)\,\eta_k\,\sigma^2}{2}$$
+
+- The **river term** depends on the distance travelled, which is the sum of the learning rates so far. A larger sum gives a lower river loss.
+- The **hill term** is the bounce caused by gradient noise σ². It depends only on the current learning rate η_k. A decay removes it.
+
+**The four arms** (peak η = 1.2e-3; the sums are my calculation from `src/schedules.py`):
+
+| Arm | Sum of η over 200 steps (relative to B) | η at step 200 (relative to peak) | Validation loss |
+|---|---|---|---|
+| B: WSD-300, stopped at 200 | 1.00 | 1.00 | 6.6200 |
+| C: WSD-200 (cooldown 160–200) | 0.90 | 0.10 | **6.6175** |
+| A: cosine-300, stopped at 200 | 0.78 | 0.37 | 6.6387 |
+| D: cosine-200 | 0.59 | 0.10 | 6.7067 |
+
+**Two comparisons separate the terms:**
+- **C against D: same final η, different sum.** Both end at 0.1 × peak, so their hill terms are equal. C travelled 54% further and is 0.089 lower. This is the river term alone.
+- **C against B: almost the same sum, different final η.** C gave up 10% of the distance and cut the final η by 10×. The net gain was only 0.0025. Thus the hill term was small at this stage.
+
+**Conclusion.** At 1.6 M tokens the river term is steep: each extra unit of distance lowers the loss a lot. The hill term is small. Thus a high η for as long as possible wins, and cosine-200, which decays earliest, loses at every peak η.
+
+**Why this does not contradict Hägele et al.** Their Figure 1 repeats the Chinchilla result: at each length, the best cosine run is the one planned for that length. Their runs are long. For example, Figure 3 trains a 210 M model for 22,000–44,000 steps, to a perplexity near 20 (a loss near 3). There, the river term is flat and the hill term is a larger share of the loss. Wen et al. (Figure 6) show the same picture: WSD is behind during the stable phase and ahead only after its decay. My run is in the very early regime, where the order is different. The prediction is that a longer run reverses the order of D and A, and that C then matches or beats D. Hägele et al. find that a cooldown of 10–20% matches cosine (Figure 5). That is the test to run next (interview N3).
+
+**Other points from the papers:**
+- Hägele et al. (Figure 3) find that the best peak η for constant + cooldown is about half of the best cosine peak η. The ×2 grid of Part 4 put every arm at 1.2e-3, so it could not show this.
+- A (1 − sqrt) cooldown shape was better than linear (Hägele et al., Figure 4). The gain grows with run length. Part 4 used linear.
+- The gain from a longer cooldown stops at about 20% of the run (Hägele et al., Figure 5). Arm C used 20%.
+- Weight averaging (SWA) during the constant phase recovers part of the cooldown gain without a cooldown (Hägele et al., Takeaway 5). A cheap test: average the last 40 checkpoints of arm B.
+- Wen et al. propose WSD-S: continue from the decayed checkpoint and do not roll back. In their tests it beat WSD and cyclic cosine. The decay phase also makes progress along the river (the sum of η in Theorem 3.5).
+
+### 16.4 Part 5: why the exponent is −0.78, and why the width-4096 value is too high
+
+**Result.** LR* ∝ width^−0.78 (90% bootstrap −0.79 to −0.75). The prediction for width 4096 is 1.9e-4.
+
+**What theory allows.** Everett et al. (Table 1) give the largest stable per-layer η for Adam in the standard parameterization (SP):
+
+| Layer | "Full alignment" | "No alignment" |
+|---|---|---|
+| Embedding | constant | constant |
+| Hidden matrices | 1/n | 1/√n |
+| Readout (output layer) | 1/n | 1/√n |
+
+"Alignment" is how strongly the updates correlate with the activations. Everett et al. measured it in training (section 4.1, Figure 2): it is between the two cases, and it changes during training. One global η must suit all layers. Thus its exponent is expected between −1 and −0.5, and the embedding pulls it toward 0. The measured −0.78 is in that range.
+
+**The tied embedding in nanoGPT.** The token table is both the embedding (which wants a constant η) and the readout (which wants 1/n). It is 80% of the weights at width 256 and 51% at width 1024. Thus the mix of layer types changes along the fitted line. This is one reason why the local slope changes from −0.85 (256 to 512) to −0.71 (512 to 1024).
+
+**The production fix.** Everett et al. (Table 3) found the best Adam setup up to 26.8 B weights: SP with per-layer η and tuned constant factors. The embedding η is constant; the hidden and readout η scale as 1/n. This setup was better than μP. They also show that every parameterization can transfer hyperparameters when the per-layer constants are tuned. Their runs used 50,000 steps and no weight decay. Their appendix I says that compute-optimal horizons probably need steeper exponents.
+
+**The token horizon.** Bjorck et al. measure LR* against the number of training tokens D:
+- LR*(D) = B·D^−β for each model size (equation 1). Longer training needs a smaller η.
+- LR*(N, D) = C·N^−α·D^−β with α ≈ 0.23 and β ≈ 0.32, fitted for models of 760 M weights and more (equations 3–4). Smaller models gave a larger β.
+- μP does not remove the horizon effect (section 3.3).
+- They locate each minimum with a quadratic fit in log(η), the same method as Part 5. Their bootstrap gives a relative error of a few percent (section 3.4), the same size as the Part 5 intervals.
+
+My calculation shows the size of the effect. Part 5 used 2.5 M tokens per run. A width-4096 model would train on billions of tokens. If β = 0.32 held from 2.5 M to 1 B tokens (400×), LR* would fall by 400^−0.32 ≈ 0.15. That would move the prediction from 1.9e-4 to about 3e-5. β was measured at 25 B tokens and more, not at 2.5 M, so this is an illustration of size, not a prediction. The conclusion: **the horizon effect can be larger than the width effect.** Thus the width-4096 value from Part 5 is an upper limit for a real run. The bootstrap interval does not include this error.
+
+**Width versus weight count.** Part 5 changes only the width, so the weight count grows 6.4× for a 4× width. In weight-count terms the fit is LR* ∝ N^−0.58. Bjorck et al. found α ≈ 0.23, but their models also change depth and train far longer. The two numbers are not comparable.
+
+### 16.5 Summary: prediction against measurement
+
+| Part | Prediction before the run | Measurement | Explanation |
+|---|---|---|---|
+| 2 | Bias correction matters for β2 = 0.999 and is small for 0.95 | Confirmed: 0.64 and 0.035 | Anti-warmup (16.1) |
+| 3 | ρ settles when rotational equilibrium is reached | ρ settled at steps 65–78, but equilibrium needs about 2,500 steps | The Adam step becomes noise-dominated (16.2) |
+| 3 | ρ near the 1e-3 guide | 1.7e-2 | Transient phase from a small initialization (16.2) |
+| 4 | Cosine better than WSD at step 200 | WSD better; cosine-200 worst | River term dominates early (16.3) |
+| 5 | LR* falls with width | Confirmed: width^−0.78 | Between the Everett et al. limits (16.4) |
+| 5 | Prediction for 4096 is uncertain | Interval ±3% from seeds | The horizon and alignment errors are larger (16.4) |
+
+Four of the six predictions were wrong or incomplete. Each came from applying a long-run result (equilibrium, the 1e-3 guide, Chinchilla's cosine rule, a horizon-free LR) to a run of 300 steps or less. The lesson for a frugal budget: a short proxy run measures early-training behaviour. Before you use a proxy result for a long run, check that the result does not depend on the run length.
