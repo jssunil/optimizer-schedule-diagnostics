@@ -22,7 +22,7 @@ def adam_by_hand(theta0, grads, lr, beta1, beta2, eps, weight_decay=0.0, decoupl
     """
     theta, m, v, rows = float(theta0), 0.0, 0.0, []
     for t, g in enumerate(grads, start=1):
-        g_used = float(g)
+        g_used, before = float(g), theta
         if weight_decay and decoupled:
             theta *= 1 - lr * weight_decay
         elif weight_decay:
@@ -31,9 +31,9 @@ def adam_by_hand(theta0, grads, lr, beta1, beta2, eps, weight_decay=0.0, decoupl
         v = beta2 * v + (1 - beta2) * g_used * g_used
         m_hat = m / (1 - beta1 ** t) if bias_correction else m
         v_hat = v / (1 - beta2 ** t) if bias_correction else v
-        step = -lr * m_hat / (math.sqrt(v_hat) + eps)
-        theta += step
-        rows.append(dict(t=t, g=float(g), m=m, v=v, m_hat=m_hat, v_hat=v_hat, step=step, theta=theta))
+        theta += -lr * m_hat / (math.sqrt(v_hat) + eps)
+        # step = total change of theta in this step (Adam step plus decoupled decay), as torch_rows measures it
+        rows.append(dict(t=t, g=float(g), m=m, v=v, m_hat=m_hat, v_hat=v_hat, step=theta - before, theta=theta))
     return rows
 
 
