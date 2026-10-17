@@ -10,6 +10,7 @@ The model is nanoGPT from [training-loop-diagnostics](https://github.com/jssunil
 |---|---|
 | [PLAN.md](PLAN.md) | Implementation plan: design options for each part, with advantages, disadvantages and the reason for each choice; fairness protocol; compute budget; tests. |
 | [SESSION_11_EXPLAINER.md](SESSION_11_EXPLAINER.md) | Session 11 in depth: Adam, AdamW, bias correction, warmup, cosine and WSD, μP, newer optimizers, fair comparison; 33 checked papers with the key points of each (for the assignment) and the repos that implement them. |
+| [SYSTEM_WALKTHROUGH.md](SYSTEM_WALKTHROUGH.md) | Three use cases through the full stack (one local training step, one V5 step on 768 GPUs, serving many users): OS, processes, CPU and GPU memory hierarchy, multiple GPUs and nodes, with diagrams. |
 
 ## How to run
 
